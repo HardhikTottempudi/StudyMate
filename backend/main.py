@@ -74,11 +74,13 @@ def _gemini_generate(prompt: str) -> str:
     if not api_key:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY is not set")
 
-    model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
-    url = (
-        f"https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{model}:generateContent?key={api_key}"
-    )
+    preferred_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    candidate_models = [
+        preferred_model,
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-1.5-flash-001",
+    ]
 
     payload = {
         "contents": [
@@ -95,16 +97,29 @@ def _gemini_generate(prompt: str) -> str:
             "temperature": 0.2,
         },
     }
+    last_error = None
+    for model in candidate_models:
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{model}:generateContent?key={api_key}"
+        )
+        response = requests.post(url, json=payload, timeout=30)
+        if response.status_code == 404:
+            last_error = response.text
+            continue
+        if response.status_code >= 400:
+            raise HTTPException(status_code=502, detail=response.text)
 
-    response = requests.post(url, json=payload, timeout=30)
-    if response.status_code >= 400:
-        raise HTTPException(status_code=502, detail=response.text)
+        data = response.json()
+        try:
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Unexpected Gemini response: {data}") from exc
 
-    data = response.json()
-    try:
-        return data["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Unexpected Gemini response: {data}") from exc
+    raise HTTPException(
+        status_code=502,
+        detail=f"No supported Gemini model resolved. Last error: {last_error}",
+    )
 
 
 @app.get("/health")
