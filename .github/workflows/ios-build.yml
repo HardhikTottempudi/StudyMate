@@ -1,0 +1,55 @@
+name: Build iOS App
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.5'
+        channel: 'stable'
+        
+    - name: Install dependencies
+      run: flutter pub get
+      
+    - name: Install CocoaPods dependencies
+      working-directory: ios
+      run: pod install
+      
+    - name: Build iOS app
+      run: flutter build ios --release --no-codesign
+      
+    - name: Archive iOS app
+      working-directory: ios
+      run: |
+        xcodebuild -workspace Runner.xcworkspace \
+          -scheme Runner \
+          -configuration Release \
+          -archivePath build/Runner.xcarchive \
+          archive
+          
+    - name: Export IPA
+      working-directory: ios
+      run: |
+        xcodebuild -exportArchive \
+          -archivePath build/Runner.xcarchive \
+          -exportPath build/ipa \
+          -exportOptionsPlist ExportOptions.plist
+          
+    - name: Upload IPA artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ios-app
+        path: ios/build/ipa/*.ipa

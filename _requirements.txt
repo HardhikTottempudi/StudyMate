@@ -1,0 +1,199 @@
+StudyMate – MVP Requirements Document
+Version 0.1 • January 2026
+1. Purpose
+StudyMate is a mobile app that helps learners stay consistent and study smarter through: (1) a study timer and analytics, (2) focus aids like white-noise audio and motivational 
+quotes, and (3) AI-assisted study content such as flashcards and mindmaps.
+2. MVP Goals
+Enable users to sign up / log in securely (Firebase Authentication).
+Let users run a study timer and automatically save study sessions.
+Show a dashboard with today’s st
+udy time and simple weekly analytics.
+Provide a white-noise player that continues playing while navigating the app.
+Generate and save AI flashcards and AI mindmaps from a topic / notes.
+3. Target Platforms &amp; Tech
+Client: Flutter (iOS + Android)
+Backend: Fi
+rebase (Auth + Firestore + Storage as needed)
+AI: Gemini or equivalent via a secure backend proxy (Cloud Functions recommended).
+4. What Exists in Your Current React Native Project (from the uploaded ZIP)
+Your current project is an Expo + TypeScript app us
+ing Expo Router. It already includes:
+Firebase Authentication setup with React Native persistence (AsyncStorage).
+Login and Signup screens under app/(auth)/.
+Tabbed navigation under app/(tabs)/ including screens for dashboard (index), flashcards, mindmaps,
+ and study-session.
+Study data persistence utilities using AsyncStorage (services/studyDataService.ts).
+Flashcards generation that calls the Gemini API directly from the client (currently with a hardcoded API key).
+Additional screens/features like detectio
+n/drowsiness/app blocking that can be considered out-of-scope for the MVP if you want to keep it lean.
+This MVP document below assumes you are moving to Flutter, while keeping the same product scope.
+5. Functional Requirements
+5.1 Authentication (Firebase 
+Auth)
+<w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/><w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr><w:tblGrid><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/></w:tblGrid><w:tr w:rsidR="0064741F"><w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Requirement
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Description
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Acceptance Criteria
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Sign up
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Create account using email + password.
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>User can create account and is routed to Dashboard.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Login
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Authenticate and persist session.
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>User remains logged in after restarting the app.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Forgot password
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Send password reset email.
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Reset email is sent for a valid email address.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Logout
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>End session and return to auth stack.
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>User sees Login screen and cannot access tabs.
+5.2 Dashboard
+<w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/><w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr><w:tblGrid><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/></w:tblGrid><w:tr w:rsidR="0064741F"><w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Requirement
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Description
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Acceptance Criteria
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Today summary
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Display total
+ study time for today (hours/minutes).
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Matches the sum of today’s saved sessions.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Quick actions
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Buttons/cards to Timer, AI Flashcards, AI Mindmap, White Noise.
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Each action navigates correctly.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Motivation carousel
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Show rotating study quotes/images (static
+ list for MVP).
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Carousel scrolls smoothly and doesn’t crash.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Weekly stats (basic)
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Total time per day for last 7 days (simple chart or list).
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Uses stored sessions; updates after new session.
+5.3 Study Timer
+<w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/><w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr><w:tblGrid><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/></w:tblGrid><w:tr w:rsidR="0064741F"><w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Requirement
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Description
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Acceptance Criteria
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Timer controls
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Start, pause, resume, stop.
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Duration tracks correctly across pause/resume.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Save session
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>On stop, save a study session record.
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>A session record exists and appears in analytics.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Optional notes/subject
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Allow tagging a subject or quick note (o
+ptional for MVP).
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>If enabled, saved and visible on session details.
+5.4 White Noise Player
+<w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/><w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr><w:tblGrid><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/></w:tblGrid><w:tr w:rsidR="0064741F"><w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Requirement
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Description
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Acceptance Criteria
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Local audio list
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Provide 3–5 bundled sounds (rain, cafe, etc.).
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Sounds load instantly and play without errors.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Backgr
+ound playback
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Audio continues while user navigates within the app.
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Audio does not stop on screen change.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Basic controls
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Play/Pause + switch track.
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Controls respond within 300ms.
+5.5 AI Flashcards
+<w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/><w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr><w:tblGrid><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/></w:tblGrid><w:tr w:rsidR="0064741F"><w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Requirement
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Description
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Acceptance Criteria
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Input
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t xml:space="preserve">Topic 
++ optional pasted notes.
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>User can submit topic/notes.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Generate
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Create up to 10 flashcards (Q/A).
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Cards are displayed and are readable.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Save set
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Save a flashcard set to backend storage.
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>User can reopen saved sets later.
+5.6 AI Mindmap
+<w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/><w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr><w:tblGrid><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/></w:tblGrid><w:tr w:rsidR="0064741F"><w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Requirement
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Description
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Acceptance Criteria
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Input
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Topic + optional notes.
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>User can submit topic/notes.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Generate
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Create a hierarchical mindmap structure.
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Mindmap renders (tree view acceptable for MVP).
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Save
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Save mindmap to backend storage.
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t xml:space="preserve">User can reopen saved 
+mindmaps later.
+6. Data Model (Firestore Suggested)
+Suggested collections and documents (per user):
+users/{uid} – basic profile + settings
+users/{uid}/studySessions/{sessionId} – timer sessions (startTime, endTime, durationSeconds, createdAt)
+users/{uid}/flashcardSets/{setId} – title, sourceText (optional), cards[], createdAt
+users/{uid}/mindmaps/{mapId} – title, sourceText (optional), nodes[] or nested tree, createdAt
+Notes:
+Keep durations in seconds for easy aggregation.
+Use server timestamps
+ for createdAt when possible.
+7. Security &amp; Privacy Requirements
+Firebase Security Rules (minimum):
+Users can only read/write their own subcollections.
+Deny all access when request.auth == null.
+AI key management:
+Your current React Native flashcards scree
+n calls the Gemini API directly from the client and includes an API key. For the Flutter MVP, do NOT ship API keys in the app binary. Use a backend proxy (Firebase Cloud Functions) that accepts authenticated requests and calls the AI provider server-side.
+8. Non-Functional Requirements
+Performance: Dashboard loads within 2 seconds on a mid-range phone.
+Reliability: If offline, user can still use timer and see cached data; sync when online (optional but recommended).
+Usability: Core actions reachable within 
+1–2 taps from Dashboard.
+Observability (optional): Firebase Crashlytics and Analytics for crashes and funnel tracking.
+9
+. Flutter Migration Notes (Reac
+t Native → Flutter)
+Suggested Flutter folder structure:
+lib/main.dart (bootstrap, Firebase init, router)
+lib/features/auth/ (login, signup, auth controller)
+lib/features/dashboard/ (dashboard screen, widgets, charts)
+lib/features/timer/ (timer screen, stat
+e management, models)
+lib/features/ai_flashcards/ (generator, viewer, saved sets)
+lib/features/ai_mindmap/ (generator, tree renderer, saved maps)
+lib/services/ (firestore repository, ai client, audio service)
+lib/shared/ (theme, reusable widgets)
+State 
+management (pick one): Riverpod or Bloc are common choices. Keep it simple for MVP.
+Route mapping idea: Your Expo Router tabs map well to Flutter’s bottom navigation (Dashboard, Timer, Flashcards, Mindmaps, Settings).
+10
+. Build Plan &amp; Milestones
+<w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/><w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="1" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr><w:tblGrid><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/><w:gridCol w:w="2880"/></w:tblGrid><w:tr w:rsidR="0064741F"><w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Milestone
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Deliverable
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Definition of Done
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>M1
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Firebase setup in Flutter + auth screens working
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Feature works end-to-end on device + no critical crashes.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>M2
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Firestore write/read + study timer saves sessions
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Feature works end-to-end on device + no critical crashes.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>M3
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Dashboard today total + last 7 days analytics
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Feature works end-to-end on device + no critical crashes.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>M4
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>White noise player (local audio + background playback)
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Feature works end-to-end on device + no critical crashes.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>M5
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t xml:space="preserve">AI proxy (Cloud Function) + 
+AI flashcards generation + save/reopen
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Feature works end-to-end on device + no critical crashes.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>M6
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>AI mindmap generation + render + save/reopen
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Feature works end-to-end on device + no critical crashes.
+<w:tc><w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>M7
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Polish: empty states, loading, error handling, s
+ettings/logout
+<w:tcPr><w:tcW w:w="2880" w:type="dxa"/></w:tcPr><w:p w:rsidR="0064741F" w:rsidRDefault="00047643"><w:r><w:t>Feature works end-to-end on device + no critical crashes.
+11
+. MVP Release Checklist
+User can sign up, log in, log out.
+Timer sessions save and appear in dashboard totals.
+Dashboard shows today total + last 7 days summary.
+White noise plays
+ reliably and continues during navigation.
+AI flashcards generate via backend proxy and can be saved/reopened.
+AI mindmap generates and can be saved/reopened.
+No API keys stored in client code.
+Firestore rules prevent cross-user data access.

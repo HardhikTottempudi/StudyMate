@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: studymate-ai
+    env: docker
+    rootDir: backend
+    plan: free
+    autoDeploy: true
