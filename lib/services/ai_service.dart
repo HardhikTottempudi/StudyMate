@@ -7,7 +7,7 @@ class AIService {
   // flutter run --dart-define=AI_BACKEND_BASE_URL=https://your-cloud-run-url
   static const String _backendBaseUrl = String.fromEnvironment(
     'AI_BACKEND_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8080',
+    defaultValue: 'https://fetchdata-jx72.onrender.com',
   );
 
   static Future<Map<String, dynamic>> generateFlashcards(
@@ -32,12 +32,17 @@ class AIService {
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
-      } else {
-        throw Exception('Failed to generate flashcards: ${response.body}');
       }
+      throw Exception(
+        'Flashcards API error (${response.statusCode}): ${response.body}',
+      );
     } catch (e) {
-      // For development, return mock data if cloud function is not set up
-      return _mockFlashcards(topic);
+      // Keep mock fallback for local emulator development only.
+      if (_backendBaseUrl.contains('10.0.2.2') ||
+          _backendBaseUrl.contains('localhost')) {
+        return _mockFlashcards(topic);
+      }
+      rethrow;
     }
   }
 
@@ -63,12 +68,17 @@ class AIService {
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
-      } else {
-        throw Exception('Failed to generate mindmap: ${response.body}');
       }
+      throw Exception(
+        'Mindmap API error (${response.statusCode}): ${response.body}',
+      );
     } catch (e) {
-      // For development, return mock data if cloud function is not set up
-      return _mockMindmap(topic);
+      // Keep mock fallback for local emulator development only.
+      if (_backendBaseUrl.contains('10.0.2.2') ||
+          _backendBaseUrl.contains('localhost')) {
+        return _mockMindmap(topic);
+      }
+      rethrow;
     }
   }
 

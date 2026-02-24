@@ -45,5 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>StudyMate uses camera to capture your daily study moment.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>StudyMate uses photos for sharing study streak snaps.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>StudyMate may save generated study snapshots.</string>
 </dict>
 </plist>

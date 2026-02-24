@@ -1,17 +1,24 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../../../services/ai_service.dart';
+import '../../../shared/models/flashcard_set.dart';
+import '../../auth/providers/auth_provider.dart';
+import 'flashcard_viewer_screen.dart';
 
-class FlashcardsScreen extends StatefulWidget {
+class FlashcardsScreen extends ConsumerStatefulWidget {
   const FlashcardsScreen({super.key});
 
   @override
-  State<FlashcardsScreen> createState() => _FlashcardsScreenState();
+  ConsumerState<FlashcardsScreen> createState() => _FlashcardsScreenState();
 }
 
-class _FlashcardsScreenState extends State<FlashcardsScreen> {
+class _FlashcardsScreenState extends ConsumerState<FlashcardsScreen> {
   final TextEditingController _promptController = TextEditingController();
   bool _isLoading = false;
-  List<_Flashcard> _flashcards = [];
+  bool _isSaving = false;
+  bool _isSaved = false;
+  List<Flashcard> _flashcards = [];
 
   @override
   void dispose() {
@@ -25,160 +32,251 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
     setState(() {
       _isLoading = true;
+      _isSaved = false;
     });
 
     try {
       final response = await AIService.generateFlashcards(prompt, null);
       final cards = (response['cards'] as List<dynamic>)
-          .map((card) => _Flashcard(
+          .map((card) => Flashcard(
+                id: const Uuid().v4(),
                 question: card['question'] ?? '',
                 answer: card['answer'] ?? '',
               ))
+          .where((card) => card.question.isNotEmpty && card.answer.isNotEmpty)
           .toList();
 
       setState(() {
         _flashcards = cards;
       });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Flashcards error: $e')),
+      );
     } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _saveFlashcards() async {
+    if (_flashcards.isEmpty || _isSaving) return;
+    setState(() {
+      _isSaving = true;
+    });
+    try {
+      final set = FlashcardSet(
+        id: const Uuid().v4(),
+        title: _promptController.text.trim(),
+        sourceText: null,
+        cards: _flashcards,
+        createdAt: DateTime.now(),
+      );
+      await ref.read(firestoreServiceProvider).saveFlashcardSet(set);
+      if (!mounted) return;
       setState(() {
-        _isLoading = false;
+        _isSaved = true;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Flashcards saved to Firebase')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Save failed: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context),
-            const SizedBox(height: 16),
-            _buildPromptSection(context),
-            const SizedBox(height: 16),
-            if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(),
-              )
-            else
-              Expanded(child: _buildFlashcardGrid()),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Stack(
-      children: [
-        ClipRRect(
-          borderRadius: const BorderRadius.only(
-            bottomLeft: Radius.circular(24),
-            bottomRight: Radius.circular(24),
-          ),
-          child: Image.asset(
-            'assets/images/flashcards/ai_generated_flashcard.png',
-            width: double.infinity,
-            fit: BoxFit.cover,
+      appBar: AppBar(title: const Text('AI Flashcards')),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFFDEDF4),
+              Color(0xFFF2F7FF),
+              Color(0xFFF0FAF4),
+            ],
           ),
         ),
-        Positioned.fill(
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Text(
-                'Flashcards',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFFE6B9FA),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            children: [
+              _SoftCard(
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _promptController,
+                      decoration: const InputDecoration(
+                        hintText: 'Enter topic for flashcards',
+                        prefixIcon: Icon(Icons.auto_awesome_rounded),
+                      ),
                     ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _generateFlashcards,
+                            child: const Text('Generate'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _flashcards.isEmpty || _isSaved || _isSaving
+                                ? null
+                                : _saveFlashcards,
+                            child: _isSaving
+                                ? const SizedBox(
+                                    height: 16,
+                                    width: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : Text(_isSaved ? 'Saved' : 'Save'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
+              const SizedBox(height: 12),
+              if (_isLoading) const CircularProgressIndicator(),
+              if (!_isLoading) ...[
+                Expanded(flex: 3, child: _buildFlashcardGrid()),
+                const SizedBox(height: 10),
+                Expanded(flex: 2, child: _buildSavedTopics(context)),
+              ],
+            ],
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildPromptSection(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          SizedBox(
-            height: 56,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.asset(
-                      'assets/images/ui/search_bar.png',
-                      fit: BoxFit.fill,
-                    ),
-                  ),
-                ),
-                TextField(
-                  controller: _promptController,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter your prompt here ..',
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton(
-            onPressed: _isLoading ? null : _generateFlashcards,
-            child: const Text('Generate Flashcards'),
-          ),
-        ],
       ),
     );
   }
 
   Widget _buildFlashcardGrid() {
     if (_flashcards.isEmpty) {
-      return const Center(
-        child: Text('No flashcards yet'),
+      return const _SoftCard(
+        child: Center(child: Text('No generated flashcards yet')),
       );
     }
 
     return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      itemCount: _flashcards.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 1.1,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 1.08,
       ),
-      itemCount: _flashcards.length,
-      itemBuilder: (context, index) {
-        final card = _flashcards[index];
-        return _FlipCard(card: card);
-      },
+      itemBuilder: (context, index) => _FlipCard(card: _flashcards[index]),
+    );
+  }
+
+  Widget _buildSavedTopics(BuildContext context) {
+    return _SoftCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Saved Topics',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 6),
+          Expanded(
+            child: StreamBuilder<List<FlashcardSet>>(
+              stream: ref.read(firestoreServiceProvider).getFlashcardSets(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return const Center(child: Text('Failed to load saved topics'));
+                }
+                final sets = snapshot.data ?? [];
+                if (sets.isEmpty) {
+                  return const Center(child: Text('No saved flashcard topics yet'));
+                }
+                return ListView.separated(
+                  itemCount: sets.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 6),
+                  itemBuilder: (context, index) {
+                    final set = sets[index];
+                    return ListTile(
+                      tileColor: const Color(0xFFFFFFFF),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      title: Text(set.title),
+                      subtitle: Text('${set.cards.length} cards'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => FlashcardViewerScreen(flashcardSet: set),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _Flashcard {
-  final String question;
-  final String answer;
+class _SoftCard extends StatelessWidget {
+  const _SoftCard({required this.child});
+  final Widget child;
 
-  const _Flashcard({
-    required this.question,
-    required this.answer,
-  });
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x12000000),
+            blurRadius: 16,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
 }
 
 class _FlipCard extends StatefulWidget {
-  final _Flashcard card;
-
   const _FlipCard({required this.card});
+  final Flashcard card;
 
   @override
   State<_FlipCard> createState() => _FlipCardState();
@@ -189,29 +287,29 @@ class _FlipCardState extends State<_FlipCard> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _showAnswer = !_showAnswer;
-        });
-      },
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        transitionBuilder: (child, animation) {
-          return ScaleTransition(scale: animation, child: child);
-        },
-        child: Container(
-          key: ValueKey(_showAnswer),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF606060),
-            borderRadius: BorderRadius.circular(12),
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => setState(() => _showAnswer = !_showAnswer),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: _showAnswer
+                ? [const Color(0xFFE8F8FF), const Color(0xFFF5EEFF)]
+                : [const Color(0xFFFFF1F3), const Color(0xFFF5F1FF)],
           ),
-          child: Center(
-            child: Text(
-              _showAnswer ? 'A: ${widget.card.answer}' : 'Q: ${widget.card.question}',
-              style: const TextStyle(color: Colors.white),
-              textAlign: TextAlign.center,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Center(
+          child: Text(
+            _showAnswer ? widget.card.answer : widget.card.question,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF334155),
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),

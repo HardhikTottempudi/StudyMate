@@ -11,9 +11,9 @@ dependencies:
     sdk: flutter
   
   # Firebase
-  firebase_core: ^2.24.2
-  firebase_auth: ^4.15.3
-  cloud_firestore: ^4.13.6
+  firebase_core: ^4.4.0
+  firebase_auth: ^6.1.4
+  cloud_firestore: ^6.1.2
   
   # State Management
   flutter_riverpod: ^2.4.9
@@ -25,6 +25,8 @@ dependencies:
   # Audio Player
   audioplayers: ^5.2.1
   url_launcher: ^6.3.1
+  image_picker: ^1.1.2
+  path_provider: ^2.1.5
   
   # Charts
   fl_chart: ^0.65.0

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -67,7 +67,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         title: const Text('Dashboard'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout_rounded),
             onPressed: () async {
               await ref.read(authControllerProvider.notifier).signOut();
             },
@@ -75,141 +75,270 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
         ],
       ),
-      body: sessionsAsync.when(
-        data: (_) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFFDEDF0),
+              Color(0xFFF0F8FF),
+              Color(0xFFEEF8F2),
+            ],
+          ),
+        ),
+        child: sessionsAsync.when(
+          data: (sessions) => SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Dashboard',
+                  'Hi ${user?.displayName ?? 'there'}',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF2D3142),
                       ),
                 ),
-                const SizedBox(height: 6),
                 Text(
-                  user?.displayName != null
-                      ? 'Welcome back, ${user!.displayName}!'
-                      : 'Stay consistent, stay sharp.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey[600],
+                  'Keep your momentum steady today.',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: const Color(0xFF6F7480),
                       ),
                 ),
-                const SizedBox(height: 16),
-                _buildTopCarousel(context),
-                const SizedBox(height: 25),
-                _buildPerformanceTracker(context),
-                const SizedBox(height: 30),
-                SizedBox(
-                  height: 120,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      _buildDistractionWidget(context),
-                      const SizedBox(width: 12),
-                      _buildAppBlockingCard(context),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 14),
+                _buildTopRow(context),
+                const SizedBox(height: 14),
+                _buildPerformanceTracker(context, sessions),
+                const SizedBox(height: 14),
                 _buildRainPlayer(context),
               ],
             ),
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
-              const SizedBox(height: 16),
-              Text('Error loading data: $error'),
-            ],
+          ),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stack) => Center(
+            child: Text('Error loading dashboard: $error'),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildTopCarousel(BuildContext context) {
-    return Column(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: SizedBox(
-            height: 150,
-            width: double.infinity,
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: _carouselImages.length,
-              onPageChanged: (index) {
-                setState(() {
-                  _currentPage = index;
-                });
-              },
-              itemBuilder: (context, index) {
-                return Image.asset(
-                  _carouselImages[index],
-                  fit: BoxFit.cover,
-                );
-              },
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(_carouselImages.length, (index) {
-            final isActive = _currentPage == index;
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              height: isActive ? 10 : 8,
-              width: isActive ? 10 : 8,
-              decoration: BoxDecoration(
-                color: isActive ? Colors.black : Colors.grey,
-                shape: BoxShape.circle,
-              ),
-            );
-          }),
-        ),
-      ],
+  Widget _buildTopRow(BuildContext context) {
+    return SizedBox(
+      height: 220,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(flex: 2, child: _buildTopCarousel(context)),
+          const SizedBox(width: 12),
+          Expanded(child: _buildAppBlockingCard(context)),
+        ],
+      ),
     );
   }
 
-  Widget _buildPerformanceTracker(BuildContext context) {
-    return Card(
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            const Text(
-              'Performance Metrix',
-              style: TextStyle(fontWeight: FontWeight.bold),
+  Widget _buildTopCarousel(BuildContext context) {
+    return _SoftCard(
+      child: Column(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: SizedBox(
+              height: 160,
+              width: double.infinity,
+              child: PageView.builder(
+                controller: _pageController,
+                itemCount: _carouselImages.length,
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentPage = index;
+                  });
+                },
+                itemBuilder: (_, index) => Image.asset(
+                  _carouselImages[index],
+                  fit: BoxFit.cover,
+                ),
+              ),
             ),
-            const SizedBox(height: 8),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(_carouselImages.length, (index) {
+              final isActive = _currentPage == index;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                height: 8,
+                width: isActive ? 24 : 8,
+                decoration: BoxDecoration(
+                  color: isActive ? const Color(0xFFF2A9AE) : const Color(0xFFD0D5DD),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPerformanceTracker(BuildContext context, List<StudySession> sessions) {
+    final totalStudy = sessions.fold<int>(0, (sum, s) => sum + s.durationSeconds);
+    final totalBreak = sessions.fold<int>(0, (sum, s) => sum + s.breakDurationSeconds);
+    final totalStudyHours = (totalStudy / 3600).toStringAsFixed(1);
+    final totalBreakMin = (totalBreak / 60).round();
+
+    return _SoftCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Performance',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _MetricChip(
+                  title: 'Study Hours',
+                  value: '$totalStudyHours h',
+                  color: const Color(0xFFE8F5E9),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _MetricChip(
+                  title: 'Breaks',
+                  value: '$totalBreakMin min',
+                  color: const Color(0xFFFDF1E6),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _MetricChip(
+                  title: 'Sessions',
+                  value: sessions.length.toString(),
+                  color: const Color(0xFFE8EEFF),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildDistractionWidget(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDistractionWidget(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.75),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.camera_alt_rounded, color: Color(0xFF7D8CC4)),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text('Focus Detection'),
+          ),
+          TextButton(
+            onPressed: _openDistractionDetection,
+            child: const Text('Open'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppBlockingCard(BuildContext context) {
+    return _SoftCard(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'App Blocking',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          Switch(
+            value: _appBlockingEnabled,
+            onChanged: (value) {
+              setState(() {
+                _appBlockingEnabled = value;
+              });
+            },
+          ),
+          Text(
+            _appBlockingEnabled ? 'Enabled' : 'Disabled',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRainPlayer(BuildContext context) {
+    return _SoftCard(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
+          children: [
             SizedBox(
-              height: 150,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: const [
-                  _PerformanceCard(title: 'Hours Completed', value: '10 Hrs'),
-                  SizedBox(width: 12),
-                  _PerformanceCardWithImage(
-                    title: 'Break duration',
-                    imagePath: 'assets/images/performance/chart.png',
+              height: 170,
+              width: double.infinity,
+              child: Image.asset(
+                'assets/images/sounds/rain.jpg',
+                fit: BoxFit.cover,
+              ),
+            ),
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.45),
+                    ],
                   ),
-                  SizedBox(width: 12),
-                  _PerformanceCard(title: 'Tasks Done', value: '24'),
-                  SizedBox(width: 12),
-                  _PerformanceCard(title: 'Focus Time', value: '2 Hrs'),
-                  SizedBox(width: 12),
-                  _PerformanceCard(title: 'Meetings', value: '3'),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 14,
+              bottom: 14,
+              right: 14,
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Rain & Thunder Focus Sound',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  FloatingActionButton.small(
+                    heroTag: 'rain_play',
+                    backgroundColor: Colors.white,
+                    onPressed: _toggleRain,
+                    child: Icon(
+                      _isRainPlaying ? Icons.pause : Icons.play_arrow,
+                      color: const Color(0xFF2D3142),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -218,174 +347,68 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ),
     );
   }
+}
 
-  Widget _buildDistractionWidget(BuildContext context) {
-    return Card(
-      elevation: 4,
-      child: SizedBox(
-        width: 250,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Camera Distraction Detection',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const Spacer(),
-              Center(
-                child: ElevatedButton.icon(
-                  onPressed: _openDistractionDetection,
-                  icon: const Icon(Icons.camera_alt),
-                  label: const Text('Open'),
-                ),
-              ),
-            ],
-          ),
+class _SoftCard extends StatelessWidget {
+  const _SoftCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFFFFF), Color(0xFFF9FBFF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-      ),
-    );
-  }
-
-  Widget _buildAppBlockingCard(BuildContext context) {
-    return Card(
-      elevation: 4,
-      child: SizedBox(
-        width: 140,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            children: [
-              const Text(
-                'App-blocking Mode',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const Spacer(),
-              Switch(
-                value: _appBlockingEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    _appBlockingEnabled = value;
-                  });
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRainPlayer(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Stack(
-        children: [
-          SizedBox(
-            height: 150,
-            width: double.infinity,
-            child: Image.asset(
-              'assets/images/sounds/rain.jpg',
-              fit: BoxFit.cover,
-            ),
-          ),
-          Positioned.fill(
-            child: Container(
-              color: Colors.black.withOpacity(0.35),
-            ),
-          ),
-          Positioned.fill(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                const Text(
-                  '20hr of Rain and thunder',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                IconButton(
-                  onPressed: _toggleRain,
-                  icon: Icon(
-                    _isRainPlaying ? Icons.pause : Icons.play_arrow,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 20,
+            offset: Offset(0, 8),
           ),
         ],
       ),
+      padding: const EdgeInsets.all(12),
+      child: child,
     );
   }
 }
 
-class _PerformanceCard extends StatelessWidget {
-  final String title;
-  final String value;
-
-  const _PerformanceCard({
+class _MetricChip extends StatelessWidget {
+  const _MetricChip({
     required this.title,
     required this.value,
+    required this.color,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 4,
-      child: SizedBox(
-        width: 180,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text(value),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PerformanceCardWithImage extends StatelessWidget {
   final String title;
-  final String imagePath;
-
-  const _PerformanceCardWithImage({
-    required this.title,
-    required this.imagePath,
-  });
+  final String value;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 4,
-      child: SizedBox(
-        width: 180,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Expanded(
-                child: Image.asset(
-                  imagePath,
-                  fit: BoxFit.contain,
+    return Container(
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
-              ),
-            ],
           ),
-        ),
+        ],
       ),
     );
   }

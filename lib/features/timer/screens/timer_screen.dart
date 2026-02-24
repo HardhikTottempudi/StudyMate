@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -17,10 +17,10 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
   );
 
   Timer? _timer;
+  bool _goalReachedNotified = false;
   final TextEditingController _sessionNameController = TextEditingController();
   final TextEditingController _goalMinutesController =
       TextEditingController(text: '25');
-  bool _isOnBreak = false;
 
   final List<String> _apps = const [
     'Instagram',
@@ -31,7 +31,6 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     'WhatsApp',
     'Snapchat',
   ];
-
   final Map<String, bool> _blocked = {};
 
   @override
@@ -74,183 +73,221 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     final timerState = ref.watch(timerProvider);
     final controller = ref.read(timerProvider.notifier);
 
+    if (controller.isGoalReached && !_goalReachedNotified) {
+      _goalReachedNotified = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Goal reached. You can stop and save.')),
+        );
+      });
+    }
+    if (!controller.isGoalReached) {
+      _goalReachedNotified = false;
+    }
+
     return Scaffold(
-      body: SafeArea(
+      appBar: AppBar(title: const Text('Study Session')),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFF5EFFF),
+              Color(0xFFF0FAFF),
+              Color(0xFFEFF9F2),
+            ],
+          ),
+        ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 24),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(24),
-                      bottomRight: Radius.circular(24),
-                    ),
-                    child: Image.asset(
-                      'assets/images/study/study_sesh.png',
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  Positioned.fill(
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Text(
-                          'Study Sesh',
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF6C5CE7),
-                              ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TextField(
-                  controller: _sessionNameController,
-                  decoration: const InputDecoration(
-                    hintText: 'New study sesh...',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('Goal Time (min): '),
-                    SizedBox(
-                      width: 80,
-                      child: TextField(
-                        controller: _goalMinutesController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                _formatDuration(timerState.elapsedSeconds),
-                style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    ElevatedButton(
-                      onPressed: timerState.isRunning
-                          ? null
-                          : () {
-                              controller.start();
-                            },
-                      child: const Text('Start'),
-                    ),
-                    ElevatedButton(
-                      onPressed: timerState.isRunning
-                          ? () {
-                              controller.pause();
-                            }
-                          : null,
-                      child: const Text('Pause'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () async {
-                        final messenger = ScaffoldMessenger.of(context);
-                        await controller.stopAndSave();
-                        if (!mounted) return;
-                        messenger.showSnackBar(
-                          const SnackBar(content: Text('Session saved')),
-                        );
-                      },
-                      child: const Text('Stop'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          _isOnBreak = !_isOnBreak;
-                          if (_isOnBreak) {
-                            controller.pause();
-                          } else {
-                            controller.resume();
-                          }
-                        });
-                      },
-                      child: Text(_isOnBreak ? 'Resume' : 'Break'),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'App Blocking',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Block These Apps During Study',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+              _SoftCard(
                 child: Column(
-                  children: _apps.map((app) {
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextField(
+                      controller: _sessionNameController,
+                      enabled: !timerState.isSessionActive,
+                      decoration: const InputDecoration(
+                        hintText: 'Session name',
+                        prefixIcon: Icon(Icons.auto_stories_rounded),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
                       children: [
-                        Expanded(child: Text(app)),
-                        Switch(
-                          value: _blocked[app] ?? false,
-                          onChanged: (value) {
-                            setState(() {
-                              _blocked[app] = value;
-                            });
-                          },
+                        const Expanded(child: Text('Goal Minutes')),
+                        SizedBox(
+                          width: 92,
+                          child: TextField(
+                            controller: _goalMinutesController,
+                            enabled: !timerState.isSessionActive,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ],
-                    );
-                  }).toList(),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () {},
-                child: const Text('Enable App Blocker Service'),
+              const SizedBox(height: 14),
+              _SoftCard(
+                child: Column(
+                  children: [
+                    Text(
+                      timerState.isOnBreak
+                          ? 'Break: ${_formatDuration(timerState.elapsedBreakSeconds)}'
+                          : _formatDuration(timerState.elapsedStudySeconds),
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF2C3550),
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text('Remaining: ${_formatDuration(controller.remainingStudySeconds)}'),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Breaks: ${timerState.breakCount}  |  Break time: ${_formatDuration(timerState.elapsedBreakSeconds)}',
+                    ),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.center,
+                      children: [
+                        ElevatedButton(
+                          onPressed: timerState.isSessionActive
+                              ? null
+                              : () {
+                                  controller.startSession(
+                                    goalDurationSeconds: _goalSeconds(),
+                                    sessionName: _sessionNameController.text.trim(),
+                                    appBlockEnabled: _blocked.values.any((v) => v),
+                                    blockedApps: _blocked.entries
+                                        .where((entry) => entry.value)
+                                        .map((entry) => entry.key)
+                                        .toList(),
+                                  );
+                                },
+                          child: const Text('Start'),
+                        ),
+                        ElevatedButton(
+                          onPressed: timerState.isRunning
+                              ? () => controller.pauseSession()
+                              : timerState.isSessionActive
+                                  ? () => controller.resumeSession()
+                                  : null,
+                          child: Text(timerState.isRunning ? 'Pause' : 'Resume'),
+                        ),
+                        ElevatedButton(
+                          onPressed: timerState.isSessionActive
+                              ? () async {
+                                  final messenger = ScaffoldMessenger.of(context);
+                                  await controller.stopAndSave();
+                                  if (!mounted) return;
+                                  messenger.showSnackBar(
+                                    const SnackBar(content: Text('Session saved')),
+                                  );
+                                }
+                              : null,
+                          child: const Text('Stop & Save'),
+                        ),
+                        ElevatedButton(
+                          onPressed:
+                              timerState.isSessionActive && !timerState.isOnBreak
+                                  ? () => controller.startBreak()
+                                  : timerState.isSessionActive && timerState.isOnBreak
+                                      ? () => controller.endBreak()
+                                      : null,
+                          child: Text(
+                            timerState.isOnBreak ? 'End Break' : 'Start Break',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _openDistractionDetection,
-                child: const Text('Add Snap (Break)'),
+              const SizedBox(height: 14),
+              _SoftCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Blocked Apps',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    ..._apps.map((app) {
+                      return SwitchListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(app),
+                        value: _blocked[app] ?? false,
+                        onChanged: timerState.isSessionActive
+                            ? null
+                            : (value) {
+                                setState(() {
+                                  _blocked[app] = value;
+                                });
+                              },
+                      );
+                    }),
+                    if (timerState.appBlockEnabled && timerState.isSessionActive)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Real app blocking needs native Android permissions/service.',
+                          style: TextStyle(color: Color(0xFFC7664F)),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Goal: ${_goalSeconds() ~/ 60} min',
-                style: TextStyle(color: Colors.grey[600]),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _openDistractionDetection,
+                  icon: const Icon(Icons.camera_alt_rounded),
+                  label: const Text('Open Focus Detection'),
+                ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SoftCard extends StatelessWidget {
+  const _SoftCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.78),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x18000000),
+            blurRadius: 16,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 }

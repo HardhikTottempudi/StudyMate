@@ -51,6 +51,11 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
       );
       state = const AsyncValue.data(null);
     } catch (e, stack) {
+      // Some platform channel errors can occur after a successful native login.
+      if (_auth.currentUser != null) {
+        state = const AsyncValue.data(null);
+        return;
+      }
       state = AsyncValue.error(e, stack);
     }
   }

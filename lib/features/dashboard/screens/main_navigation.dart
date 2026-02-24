@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'dashboard_screen.dart';
 import '../../timer/screens/timer_screen.dart';
 import '../../ai_flashcards/screens/flashcards_screen.dart';
 import '../../ai_mindmap/screens/mindmaps_screen.dart';
-import '../../../features/auth/providers/auth_provider.dart';
+import '../../study_streaks/screens/study_streaks_page.dart';
 
 class MainNavigation extends ConsumerStatefulWidget {
   const MainNavigation({super.key});
@@ -22,6 +21,7 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
     const TimerScreen(),
     const FlashcardsScreen(),
     const MindmapsScreen(),
+    const StudyStreaksPage(),
   ];
 
   @override
@@ -32,6 +32,9 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
         children: _screens,
       ),
       bottomNavigationBar: NavigationBar(
+        height: 72,
+        backgroundColor: const Color(0xFFF8F4FB),
+        indicatorColor: const Color(0xFFF6D7DC),
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
           setState(() {
@@ -58,6 +61,11 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
             icon: Icon(Icons.account_tree_outlined),
             selectedIcon: Icon(Icons.account_tree),
             label: 'Mindmaps',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.local_fire_department_outlined),
+            selectedIcon: Icon(Icons.local_fire_department),
+            label: 'Streaks',
           ),
         ],
       ),

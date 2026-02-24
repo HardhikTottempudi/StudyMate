@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/start_page.dart';
 import 'features/dashboard/screens/main_navigation.dart';
 import 'shared/theme/app_theme.dart';
@@ -35,7 +34,7 @@ class StudyMateApp extends StatelessWidget {
       title: 'StudyMate',
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
-      home: const StartPage(),
+      home: const AuthWrapper(),
     );
   }
 }
@@ -56,7 +55,7 @@ class AuthWrapper extends ConsumerWidget {
         if (snapshot.hasData) {
           return const MainNavigation();
         }
-        return const LoginScreen();
+        return const StartPage();
       },
     );
   }

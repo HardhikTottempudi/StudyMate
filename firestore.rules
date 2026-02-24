@@ -16,6 +16,18 @@ service cloud.firestore {
       match /mindmaps/{mapId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
+
+      match /studyStreaks/{friendId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+
+        match /snaps/{snapId} {
+          allow read, write: if request.auth != null && request.auth.uid == userId;
+        }
+      }
+
+      match /inboxSnaps/{snapId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
   }
 }

@@ -1,18 +1,24 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../../../services/ai_service.dart';
 import '../../../shared/models/mindmap.dart';
+import '../../auth/providers/auth_provider.dart';
 import 'mindmap_viewer_screen.dart';
 
-class MindmapsScreen extends StatefulWidget {
+class MindmapsScreen extends ConsumerStatefulWidget {
   const MindmapsScreen({super.key});
 
   @override
-  State<MindmapsScreen> createState() => _MindmapsScreenState();
+  ConsumerState<MindmapsScreen> createState() => _MindmapsScreenState();
 }
 
-class _MindmapsScreenState extends State<MindmapsScreen> {
+class _MindmapsScreenState extends ConsumerState<MindmapsScreen> {
   final TextEditingController _promptController = TextEditingController();
   bool _isLoading = false;
+  bool _isSaving = false;
+  bool _isSaved = false;
+  Mindmap? _generatedMindmap;
 
   @override
   void dispose() {
@@ -26,195 +32,256 @@ class _MindmapsScreenState extends State<MindmapsScreen> {
 
     setState(() {
       _isLoading = true;
+      _isSaved = false;
     });
 
     try {
-      await AIService.generateMindmap(prompt, null);
-      if (mounted) {
-        final mindmap = _buildSampleMindmap(prompt);
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => MindmapViewerScreen(mindmap: mindmap),
-          ),
-        );
-      }
-    } finally {
+      final response = await AIService.generateMindmap(prompt, null);
+      final rootMap = response['root'] as Map<String, dynamic>;
+      final generatedMindmap = Mindmap(
+        id: const Uuid().v4(),
+        title: prompt,
+        sourceText: null,
+        createdAt: DateTime.now(),
+        root: MindmapNode.fromMap(rootMap),
+      );
       setState(() {
-        _isLoading = false;
+        _generatedMindmap = generatedMindmap;
       });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Mindmap error: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _saveMindmap() async {
+    if (_generatedMindmap == null || _isSaving || _isSaved) return;
+    setState(() {
+      _isSaving = true;
+    });
+    try {
+      await ref.read(firestoreServiceProvider).saveMindmap(_generatedMindmap!);
+      if (!mounted) return;
+      setState(() {
+        _isSaved = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mindmap saved to Firebase')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Save failed: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context),
-            const SizedBox(height: 16),
-            _buildPromptSection(context),
-            if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(),
-              ),
-            const SizedBox(height: 8),
-            Expanded(child: _buildFolderGrid()),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Stack(
-      children: [
-        ClipRRect(
-          borderRadius: const BorderRadius.only(
-            bottomLeft: Radius.circular(24),
-            bottomRight: Radius.circular(24),
-          ),
-          child: Image.asset(
-            'assets/images/mindmaps/logo_ai_generated_mindmaps.png',
-            width: double.infinity,
-            fit: BoxFit.cover,
+      appBar: AppBar(title: const Text('AI Mindmaps')),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFEEF3FF),
+              Color(0xFFF4EEFF),
+              Color(0xFFF0FAF5),
+            ],
           ),
         ),
-        Positioned.fill(
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Text(
-                'Mind Maps',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFFE6B9FA),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            children: [
+              _SoftCard(
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _promptController,
+                      decoration: const InputDecoration(
+                        hintText: 'Enter topic for mindmap',
+                        prefixIcon: Icon(Icons.account_tree_rounded),
+                      ),
                     ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPromptSection(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          SizedBox(
-            height: 56,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.asset(
-                      'assets/images/ui/search_bar.png',
-                      fit: BoxFit.fill,
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _generateMindmap,
+                            child: const Text('Generate'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _generatedMindmap == null || _isSaving || _isSaved
+                                ? null
+                                : _saveMindmap,
+                            child: _isSaving
+                                ? const SizedBox(
+                                    height: 16,
+                                    width: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : Text(_isSaved ? 'Saved' : 'Save'),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+                  ],
                 ),
-                TextField(
-                  controller: _promptController,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter your prompt here ..',
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  ),
-                ),
+              ),
+              const SizedBox(height: 12),
+              if (_isLoading) const CircularProgressIndicator(),
+              if (!_isLoading) ...[
+                Expanded(flex: 2, child: _buildGeneratedArea(context)),
+                const SizedBox(height: 10),
+                Expanded(flex: 3, child: _buildSavedTopics(context)),
               ],
-            ),
+            ],
           ),
-          const SizedBox(height: 12),
-          ElevatedButton(
-            onPressed: _isLoading ? null : _generateMindmap,
-            child: const Text('Generate Mind Map'),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildFolderGrid() {
-    final folders = ['Physics', 'Chemistry', 'Maths'];
+  Widget _buildGeneratedArea(BuildContext context) {
+    if (_generatedMindmap == null) {
+      return const _SoftCard(
+        child: Center(child: Text('No generated mindmap yet')),
+      );
+    }
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 24,
-        crossAxisSpacing: 24,
-        childAspectRatio: 0.9,
-      ),
-      itemCount: folders.length,
-      itemBuilder: (context, index) {
-        final title = folders[index];
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            GestureDetector(
-              onTap: () {
-                final mindmap = _buildSampleMindmap(title);
+    return _SoftCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _generatedMindmap!.title,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 6),
+          Text('Main branches: ${_generatedMindmap!.root.children.length}'),
+          const Spacer(),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => MindmapViewerScreen(mindmap: mindmap),
+                    builder: (_) => MindmapViewerScreen(mindmap: _generatedMindmap!),
                   ),
                 );
               },
-              child: Image.asset(
-                'assets/images/mindmaps/folder_icon.png',
-                width: 80,
-                height: 80,
-              ),
+              child: const Text('Open Viewer'),
             ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2E7D32),
-                fontSize: 16,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Mindmap _buildSampleMindmap(String title) {
-    return Mindmap(
-      id: 'sample-$title',
-      title: title,
-      sourceText: null,
-      createdAt: DateTime.now(),
-      root: MindmapNode(
-        id: 'root',
-        text: title,
-        children: [
-          MindmapNode(
-            id: 'c1',
-            text: 'Concept 1',
-            children: [
-              MindmapNode(id: 'c1a', text: 'Detail 1'),
-              MindmapNode(id: 'c1b', text: 'Detail 2'),
-            ],
-          ),
-          MindmapNode(
-            id: 'c2',
-            text: 'Concept 2',
-            children: [
-              MindmapNode(id: 'c2a', text: 'Detail 3'),
-            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSavedTopics(BuildContext context) {
+    return _SoftCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Saved Topics',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: StreamBuilder<List<Mindmap>>(
+              stream: ref.read(firestoreServiceProvider).getMindmaps(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return const Center(child: Text('Failed to load saved topics'));
+                }
+                final maps = snapshot.data ?? [];
+                if (maps.isEmpty) {
+                  return const Center(child: Text('No saved mindmap topics yet'));
+                }
+                return ListView.separated(
+                  itemCount: maps.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 6),
+                  itemBuilder: (context, index) {
+                    final map = maps[index];
+                    return ListTile(
+                      tileColor: const Color(0xFFFFFFFF),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      title: Text(map.title),
+                      subtitle: Text('${map.root.children.length} main branches'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => MindmapViewerScreen(mindmap: map),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SoftCard extends StatelessWidget {
+  const _SoftCard({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 16,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 }

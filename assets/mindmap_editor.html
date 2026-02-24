@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+  />
+  <style>
+    html, body, #diagramDiv {
+  margin: 0;
+  height: 100%;
+  background-color: #111;
+  background-image: radial-gradient(circle, #444 1px, transparent 1px);
+  background-size: 20px 20px; /* spacing of dots */
+}
+
+  </style>
+</head>
+<body>
+  <div id="diagramDiv"></div>
+
+  <!-- GoJS UMD (works well inside WebView) -->
+  <script src="https://unpkg.com/gojs/release/go.js"></script>
+  <script>
+    (function () {
+      const send = (type, payload) => {
+        try { window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type, payload })); } catch {}
+      };
+
+      let diagram;
+
+      // Function to show explanation in a modal/alert
+      function showExplanationModal(title, explanation) {
+        if (!explanation || explanation.trim() === '') {
+          return;
+        }
+        
+        // For WebView, we'll use a simple but styled alert-like div
+        const modalHtml = `
+          <div id="explanationModal" style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            font-family: Arial, sans-serif;
+          ">
+            <div style="
+              background: #2C3E50;
+              border: 2px solid #4CAF50;
+              border-radius: 12px;
+              padding: 24px;
+              max-width: 80%;
+              max-height: 70%;
+              overflow-y: auto;
+              box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            ">
+              <h3 style="
+                color: #4CAF50;
+                margin: 0 0 16px 0;
+                font-size: 18px;
+                font-weight: bold;
+                text-align: center;
+              ">${title}</h3>
+              <p style="
+                color: #E0E0E0;
+                margin: 0 0 20px 0;
+                line-height: 1.5;
+                font-size: 14px;
+              ">${explanation}</p>
+              <div style="text-align: center;">
+                <button onclick="closeExplanationModal()" style="
+                  background: #4CAF50;
+                  color: white;
+                  border: none;
+                  padding: 10px 20px;
+                  border-radius: 6px;
+                  font-size: 14px;
+                  cursor: pointer;
+                  font-weight: bold;
+                ">Got it!</button>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        // Remove existing modal if any
+        const existingModal = document.getElementById('explanationModal');
+        if (existingModal) {
+          existingModal.remove();
+        }
+        
+        // Add modal to body
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Add click outside to close
+        document.getElementById('explanationModal').onclick = function(e) {
+          if (e.target.id === 'explanationModal') {
+            closeExplanationModal();
+          }
+        };
+      }
+      
+      // Function to close the explanation modal
+      window.closeExplanationModal = function() {
+        const modal = document.getElementById('explanationModal');
+        if (modal) {
+          modal.remove();
+        }
+      };
+
+      function init() {
+        const $ = go.GraphObject.make;
+
+        diagram = $(go.Diagram, "diagramDiv", {
+          "undoManager.isEnabled": true,
+          initialAutoScale: go.Diagram.UniformToFill,
+          layout: $(go.ForceDirectedLayout, { defaultSpringLength: 80 })
+        });
+
+        // Clean node template - shows only title, explanation on interaction
+        diagram.nodeTemplate =
+          $(go.Node, "Auto",
+            { 
+              cursor: "pointer",
+              toolTip: // Show explanation as tooltip on hover
+                $(go.Adornment, "Auto",
+                  $(go.Shape, "RoundedRectangle", 
+                    { fill: "#333", stroke: "#666", strokeWidth: 1 }),
+                  $(go.TextBlock,
+                    { 
+                      margin: 8, 
+                      stroke: "white", 
+                      font: "12px sans-serif",
+                      maxSize: new go.Size(300, NaN),
+                      wrap: go.TextBlock.WrapFit
+                    },
+                    new go.Binding("text", "explanation")
+                  )
+                )
+            },
+            $(go.Shape, "RoundedRectangle",
+              { 
+                fill: "#2C3E50", 
+                stroke: "#4CAF50", 
+                strokeWidth: 2,
+                portId: "", // Allow links to connect
+                cursor: "pointer"
+              },
+              // Highlight on hover
+              new go.Binding("fill", "isHighlighted", function(h) {
+                return h ? "#34495E" : "#2C3E50";
+              }).ofObject()
+            ),
+            $(go.TextBlock,
+              { 
+                margin: 12, 
+                stroke: "white", 
+                font: "bold 14px sans-serif",
+                wrap: go.TextBlock.WrapFit,
+                maxSize: new go.Size(200, NaN),
+                alignment: go.Spot.Center
+              },
+              new go.Binding("text", "text")
+            )
+          );
+
+        // link template
+        diagram.linkTemplate =
+          $(go.Link,
+            { routing: go.Link.Normal, curve: go.Link.Bezier, toShortLength: 4 },
+            $(go.Shape, { stroke: "#888" }),
+            $(go.Shape, { toArrow: "Standard", stroke: "#888", fill: "#888" })
+          );
+
+        // Add click interaction for detailed explanations
+        diagram.addDiagramListener("ObjectDoubleClicked", function(e) {
+          const node = e.subject.part;
+          if (node && node.data && node.data.explanation) {
+            showExplanationModal(node.data.text, node.data.explanation);
+          }
+        });
+
+        // Also support single click for mobile devices
+        diagram.addDiagramListener("ObjectSingleClicked", function(e) {
+          const node = e.subject.part;
+          if (node && node.data && node.data.explanation) {
+            // Add a small delay to distinguish from double-click
+            setTimeout(() => {
+              if (!diagram.lastTool.isBeyondDragSize()) {
+                showExplanationModal(node.data.text, node.data.explanation);
+              }
+            }, 300);
+          }
+        });
+
+        // Report changes back to RN (throttle a little)
+        let t = null;
+        diagram.addModelChangedListener(e => {
+          if (!e.isTransactionFinished) return;
+          clearTimeout(t);
+          t = setTimeout(() => {
+            const model = diagram.model.toJson();
+            send("DOC_CHANGED", { snapshot: JSON.parse(model), updatedAt: Date.now() });
+          }, 200);
+        });
+
+        // tell RN the page is ready
+        send("READY", true);
+      }
+
+      // Called from RN with: postMessage({type:'LOAD_DOC', payload:{nodeDataArray, linkDataArray}})
+      window.initMindMap = function (data) {
+        try {
+          if (!diagram) init();
+          const model = new go.GraphLinksModel(data.nodeDataArray || [], data.linkDataArray || []);
+          diagram.model = model;
+          // focus roughly on root if present
+          if (data.nodeDataArray && data.nodeDataArray.length) {
+            diagram.commandHandler.zoomToFit();
+          }
+          send("INFO", "LOAD_DOC applied");
+        } catch (err) {
+          send("ERROR", { msg: "initMindMap failed", detail: String(err) });
+        }
+      };
+
+      // Also support RN’s WebView postMessage protocol
+      function onRNMessage(evt) {
+        try {
+          const msg = JSON.parse(evt.data);
+          if (msg.type === "LOAD_DOC") {
+            window.initMindMap(msg.payload || {});
+          } else if (msg.type === "EXPORT_PNG") {
+            exportPNG();
+          } else if (msg.type === "EXPORT_SVG") {
+            exportSVG();
+          }
+        } catch (e) {
+          send("ERROR", { msg: "parse failed", detail: String(e) });
+        }
+      }
+      document.addEventListener("message", onRNMessage);   // Android
+      window.addEventListener("message", onRNMessage);     // iOS
+
+      async function exportPNG() {
+        try {
+          // Use data URL directly instead of blob
+          const pngDataUrl = diagram.makeImageData({
+            background: "#111",
+            scale: 1,
+            type: "image/png"
+          });
+          
+          if (pngDataUrl && pngDataUrl.startsWith('data:image/png;base64,')) {
+            const base64 = pngDataUrl.split(',')[1];
+            send("EXPORT_PNG_RESULT", { base64: base64, mime: "image/png" });
+          } else {
+            throw new Error("Failed to generate PNG data");
+          }
+        } catch (e) {
+          send("ERROR", { msg: "EXPORT_PNG failed", detail: String(e) });
+        }
+      }
+
+      async function exportSVG() {
+        try {
+          const svg = diagram.makeSvg({ 
+            background: "#111", 
+            scale: 1 
+          });
+          
+          if (svg) {
+            const xml = new XMLSerializer().serializeToString(svg);
+            const base64 = btoa(unescape(encodeURIComponent(xml)));
+            send("EXPORT_SVG_RESULT", { base64, mime: "image/svg+xml" });
+          } else {
+            throw new Error("Failed to generate SVG");
+          }
+        } catch (e) {
+          send("ERROR", { msg: "EXPORT_SVG failed", detail: String(e) });
+        }
+      }
+
+      // Create a visible hint so you never see blank black if nothing loads
+      window.addEventListener("load", () => {
+        init();
+        // If RN later sends LOAD_DOC, we replace the model
+        diagram.model = new go.GraphLinksModel(
+          [{ key: 1, text: "Editor Ready" }],
+          []
+        );
+      });
+    })();
+  </script>
+</body>
+</html>
