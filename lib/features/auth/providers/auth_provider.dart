@@ -17,7 +17,7 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
   final FirebaseAuth _auth;
   final FirestoreService _firestoreService;
 
-  Future<void> signUp(String email, String password, String? displayName) async {
+  Future<void> signUp(String email, String password, String? displayName, String username) async {
     state = const AsyncValue.loading();
     try {
       final credential = await _auth.createUserWithEmailAndPassword(
@@ -32,6 +32,7 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
           {
             'email': email,
             'displayName': displayName,
+            'username': username,
             'createdAt': DateTime.now().toIso8601String(),
           },
         );

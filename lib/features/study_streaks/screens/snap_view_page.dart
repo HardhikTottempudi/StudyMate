@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/streak_models.dart';
 
@@ -53,13 +52,21 @@ class _SnapViewPageState extends State<SnapViewPage> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: Image.file(
-              File(widget.snap.imagePath),
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const Center(
-                child: Icon(Icons.broken_image_rounded, color: Colors.white70),
-              ),
-            ),
+            child: widget.snap.imageUrl.isEmpty
+                ? const Center(
+                    child: Icon(Icons.broken_image_rounded,
+                        color: Colors.white70))
+                : Image.network(
+                    widget.snap.imageUrl,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (_, child, progress) => progress == null
+                        ? child
+                        : const Center(child: CircularProgressIndicator()),
+                    errorBuilder: (_, __, ___) => const Center(
+                      child: Icon(Icons.broken_image_rounded,
+                          color: Colors.white70),
+                    ),
+                  ),
           ),
           Positioned(
             top: 44,

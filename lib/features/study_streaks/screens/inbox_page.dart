@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/streak_models.dart';
 import '../services/study_streaks_service.dart';
@@ -46,14 +45,24 @@ class InboxPage extends StatelessWidget {
                 SizedBox(
                   height: 160,
                   width: double.infinity,
-                  child: Image.file(
-                    File(snap.imagePath),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: const Color(0xFFE8EAF2),
-                      child: const Icon(Icons.image_not_supported_rounded),
-                    ),
-                  ),
+                  child: snap.imageUrl.isEmpty
+                      ? Container(
+                          color: const Color(0xFFE8EAF2),
+                          child: const Icon(Icons.image_not_supported_rounded),
+                        )
+                      : Image.network(
+                          snap.imageUrl,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (_, child, progress) => progress == null
+                              ? child
+                              : const Center(
+                                  child: CircularProgressIndicator()),
+                          errorBuilder: (_, __, ___) => Container(
+                            color: const Color(0xFFE8EAF2),
+                            child:
+                                const Icon(Icons.image_not_supported_rounded),
+                          ),
+                        ),
                 ),
                 Positioned.fill(
                   child: Container(color: Colors.black.withOpacity(0.24)),
@@ -66,7 +75,7 @@ class InboxPage extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          '${snap.friendName} sent a study moment',
+                          '${snap.senderName} sent a study moment',
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,

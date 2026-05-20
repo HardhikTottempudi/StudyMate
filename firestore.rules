@@ -1,19 +1,25 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can only read/write their own data
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      
+      // Any signed-in user can read profiles (needed for username search).
+      allow read: if request.auth != null;
+      // Only the owner can write their own profile.
+      allow write: if request.auth != null && request.auth.uid == userId;
+
       match /studySessions/{sessionId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
-      
+
       match /flashcardSets/{setId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
-      
+
       match /mindmaps/{mapId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /friends/{friendId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
 
@@ -26,7 +32,10 @@ service cloud.firestore {
       }
 
       match /inboxSnaps/{snapId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        // Owner can read, update (mark viewed), and delete.
+        allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+        // Any signed-in user can CREATE a snap delivery (sending a snap to this inbox).
+        allow create: if request.auth != null;
       }
     }
   }

@@ -20,6 +20,26 @@ class FirestoreService {
     return doc.data();
   }
 
+  Future<void> setUsername(String username) async {
+    if (currentUserId == null) return;
+    await _firestore
+        .collection('users')
+        .doc(currentUserId)
+        .set({'username': username}, SetOptions(merge: true));
+  }
+
+  /// Returns `{'uid': ..., 'displayName': ..., 'username': ...}` or null.
+  Future<Map<String, dynamic>?> getUserByUsername(String username) async {
+    final query = await _firestore
+        .collection('users')
+        .where('username', isEqualTo: username.toLowerCase().trim())
+        .limit(1)
+        .get();
+    if (query.docs.isEmpty) return null;
+    final doc = query.docs.first;
+    return {'uid': doc.id, ...doc.data()};
+  }
+
   // Study Sessions
   Future<void> saveStudySession(StudySession session) async {
     if (currentUserId == null) return;

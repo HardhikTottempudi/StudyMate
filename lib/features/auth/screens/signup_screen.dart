@@ -16,6 +16,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _displayNameController = TextEditingController();
+  final _usernameController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
@@ -25,6 +26,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _displayNameController.dispose();
+    _usernameController.dispose();
     super.dispose();
   }
 
@@ -37,6 +39,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         _displayNameController.text.trim().isEmpty
             ? null
             : _displayNameController.text.trim(),
+        _usernameController.text.trim().toLowerCase(),
       );
 
       if (mounted) {
@@ -81,6 +84,26 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Display Name (Optional)',
                   ),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _usernameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Username',
+                    hintText: 'e.g. hardhik123',
+                    prefixText: '@',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please choose a username';
+                    }
+                    final clean = value.trim().toLowerCase();
+                    if (clean.length < 3) return 'At least 3 characters';
+                    if (!RegExp(r'^[a-z0-9_]+$').hasMatch(clean)) {
+                      return 'Only letters, numbers and underscores';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
