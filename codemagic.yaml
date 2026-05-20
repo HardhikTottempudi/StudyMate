@@ -14,7 +14,7 @@ workflows:
           echo $GOOGLE_SERVICE_INFO_PLIST > "$CM_BUILD_DIR/ios/Runner/GoogleService-Info.plist"
       - name: Get Flutter packages
         script: |
-          flutter pub get
+          flutter pub get --verbose
       - name: Install CocoaPods
         script: |
           cd ios && pod install
