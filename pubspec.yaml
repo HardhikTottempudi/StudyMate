@@ -39,6 +39,8 @@ dependencies:
   # Utilities
   intl: ^0.18.1
   uuid: ^4.2.1
+  shared_preferences: ^2.2.2
+  webview_flutter: ^4.4.2
 
 dev_dependencies:
   flutter_test:

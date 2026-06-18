@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,13 +12,14 @@ class TimerScreen extends ConsumerStatefulWidget {
   ConsumerState<TimerScreen> createState() => _TimerScreenState();
 }
 
-class _TimerScreenState extends ConsumerState<TimerScreen> {
+class _TimerScreenState extends ConsumerState<TimerScreen> with WidgetsBindingObserver {
   static final Uri _roboflowUri = Uri.parse(
     'https://demo.roboflow.com/drowsiness-sgvf2-tixi5/1?publishable_key=rf_JULDEIHODmWX9hxVH5cPND0AiSs2',
   );
 
   Timer? _timer;
   bool _goalReachedNotified = false;
+  bool _sessionKilledByBackground = false;
   final TextEditingController _sessionNameController = TextEditingController();
   final TextEditingController _goalMinutesController =
       TextEditingController(text: '25');
@@ -36,16 +38,42 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     for (final app in _apps) {
       _blocked[app] = false;
     }
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      ref.read(timerProvider.notifier).tick();
+      if (mounted) ref.read(timerProvider.notifier).tick();
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      final timerState = ref.read(timerProvider);
+      if (timerState.isSessionActive && !timerState.isOnBreak) {
+        _sessionKilledByBackground = true;
+        ref.read(timerProvider.notifier).resetSession();
+      }
+    }
+    if (state == AppLifecycleState.resumed && _sessionKilledByBackground) {
+      _sessionKilledByBackground = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Session ended — you left the app during a study session.'),
+            duration: Duration(seconds: 4),
+            backgroundColor: Color(0xFFC7664F),
+          ),
+        );
+      });
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _sessionNameController.dispose();
     _goalMinutesController.dispose();
@@ -212,43 +240,64 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              _SoftCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Blocked Apps',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 6),
-                    ..._apps.map((app) {
-                      return SwitchListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(app),
-                        value: _blocked[app] ?? false,
-                        onChanged: timerState.isSessionActive
-                            ? null
-                            : (value) {
-                                setState(() {
-                                  _blocked[app] = value;
-                                });
-                              },
-                      );
-                    }),
-                    if (timerState.appBlockEnabled && timerState.isSessionActive)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 8),
-                        child: Text(
-                          'Real app blocking needs native Android permissions/service.',
-                          style: TextStyle(color: Color(0xFFC7664F)),
+              if (Platform.isIOS)
+                _SoftCard(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.shield_rounded, color: Color(0xFF95B8F6)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Focus Protection',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'If you leave this app during a session, your session will be automatically ended.',
+                              style: TextStyle(color: Color(0xFF666666)),
+                            ),
+                          ],
                         ),
                       ),
-                  ],
+                    ],
+                  ),
+                )
+              else
+                _SoftCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Blocked Apps',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 6),
+                      ..._apps.map((app) {
+                        return SwitchListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(app),
+                          value: _blocked[app] ?? false,
+                          onChanged: timerState.isSessionActive
+                              ? null
+                              : (value) {
+                                  setState(() {
+                                    _blocked[app] = value;
+                                  });
+                                },
+                        );
+                      }),
+                    ],
+                  ),
                 ),
-              ),
               const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,

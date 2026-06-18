@@ -11,6 +11,48 @@ final studySessionsProvider = StreamProvider<List<StudySession>>((ref) {
   return service.getStudySessions();
 });
 
+// ── Daily quote (rotates by day of year, works offline) ──────────────────────
+
+const _kQuotes = [
+  ('The secret of getting ahead is getting started.', 'Mark Twain'),
+  ('Study hard in silence; let success make the noise.', 'Unknown'),
+  ('It always seems impossible until it\'s done.', 'Nelson Mandela'),
+  ('Education is the most powerful weapon.', 'Nelson Mandela'),
+  ('The expert in anything was once a beginner.', 'Helen Hayes'),
+  ('Push yourself, because no one else is going to do it for you.', 'Unknown'),
+  ('Great things never come from comfort zones.', 'Unknown'),
+  ('Dream it. Wish it. Do it.', 'Unknown'),
+  ('Success doesn\'t just find you. You have to go out and get it.', 'Unknown'),
+  ('The harder you work for something, the greater you\'ll feel when you achieve it.', 'Unknown'),
+  ('Don\'t stop when you\'re tired. Stop when you\'re done.', 'Unknown'),
+  ('Wake up with determination. Go to bed with satisfaction.', 'Unknown'),
+  ('Do something today that your future self will thank you for.', 'Unknown'),
+  ('Discipline is doing what needs to be done even when you don\'t want to.', 'Unknown'),
+  ('Your future is created by what you do today, not tomorrow.', 'Robert Kiyosaki'),
+  ('Strive for progress, not perfection.', 'Unknown'),
+  ('You don\'t have to be great to start, but you have to start to be great.', 'Zig Ziglar'),
+  ('Believe you can and you\'re halfway there.', 'Theodore Roosevelt'),
+  ('Act as if what you do makes a difference. It does.', 'William James'),
+  ('Success is not final, failure is not fatal: it is the courage to continue that counts.', 'Winston Churchill'),
+  ('Knowing is not enough; we must apply. Willing is not enough; we must do.', 'Goethe'),
+  ('The beautiful thing about learning is nobody can take it away from you.', 'B.B. King'),
+  ('Live as if you were to die tomorrow. Learn as if you were to live forever.', 'Gandhi'),
+  ('Intelligence plus character — that is the goal of true education.', 'Martin Luther King Jr.'),
+  ('An investment in knowledge pays the best interest.', 'Benjamin Franklin'),
+  ('There are no shortcuts to any place worth going.', 'Beverly Sills'),
+  ('Focus on being productive instead of busy.', 'Tim Ferriss'),
+  ('Energy and persistence conquer all things.', 'Benjamin Franklin'),
+  ('You are braver than you believe, stronger than you seem.', 'A.A. Milne'),
+  ('The mind is not a vessel to be filled, but a fire to be kindled.', 'Plutarch'),
+];
+
+(String quote, String author) _todaysQuote() {
+  final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays;
+  return _kQuotes[dayOfYear % _kQuotes.length];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
@@ -22,22 +64,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   static final Uri _roboflowUri = Uri.parse(
     'https://demo.roboflow.com/drowsiness-sgvf2-tixi5/1?publishable_key=rf_JULDEIHODmWX9hxVH5cPND0AiSs2',
   );
-  final PageController _pageController = PageController();
-  final AudioService _audioService = AudioService();
-  int _currentPage = 0;
-  bool _appBlockingEnabled = false;
-  bool _isRainPlaying = false;
 
-  final List<String> _carouselImages = const [
-    'assets/images/quotes/lock_in.jpg',
-    'assets/images/quotes/insp1.jpg',
-    'assets/images/quotes/inspo2.jpg',
-  ];
+  final AudioService _audioService = AudioService();
+  String? _playingId;
 
   @override
   void dispose() {
     _audioService.dispose();
-    _pageController.dispose();
     super.dispose();
   }
 
@@ -45,16 +78,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     await launchUrl(_roboflowUri, mode: LaunchMode.externalApplication);
   }
 
-  Future<void> _toggleRain() async {
-    if (_isRainPlaying) {
+  Future<void> _toggleSound(AmbientSound sound) async {
+    if (_playingId == sound.id && _audioService.isPlaying) {
       await _audioService.stop();
+      if (!mounted) return;
+      setState(() => _playingId = null);
     } else {
-      await _audioService.playRain();
+      await _audioService.play(sound);
+      if (!mounted) return;
+      setState(() => _playingId = sound.id);
     }
-    if (!mounted) return;
-    setState(() {
-      _isRainPlaying = !_isRainPlaying;
-    });
   }
 
   @override
@@ -80,11 +113,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFFDEDF0),
-              Color(0xFFF0F8FF),
-              Color(0xFFEEF8F2),
-            ],
+            colors: [Color(0xFFFDEDF0), Color(0xFFF0F8FF), Color(0xFFEEF8F2)],
           ),
         ),
         child: sessionsAsync.when(
@@ -94,7 +123,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Hi ${user?.displayName ?? 'there'}',
+                  'Hi ${user?.displayName ?? 'there'} 👋',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                         color: const Color(0xFF2D3142),
@@ -107,86 +136,94 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ),
                 ),
                 const SizedBox(height: 14),
-                _buildTopRow(context),
+                _buildDailyQuoteCard(context),
                 const SizedBox(height: 14),
                 _buildPerformanceTracker(context, sessions),
                 const SizedBox(height: 14),
-                _buildRainPlayer(context),
+                _buildWhiteNoisePlayer(context),
               ],
             ),
           ),
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => Center(
-            child: Text('Error loading dashboard: $error'),
-          ),
+          error: (e, _) => Center(child: Text('Error: $e')),
         ),
       ),
     );
   }
 
-  Widget _buildTopRow(BuildContext context) {
-    return SizedBox(
-      height: 220,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(flex: 2, child: _buildTopCarousel(context)),
-          const SizedBox(width: 12),
-          Expanded(child: _buildAppBlockingCard(context)),
+  // ── Daily Quote Card ────────────────────────────────────────────────────────
+
+  Widget _buildDailyQuoteCard(BuildContext context) {
+    final (quote, author) = _todaysQuote();
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF7C5CBF), Color(0xFF4A90D9)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x337C5CBF),
+            blurRadius: 20,
+            offset: Offset(0, 8),
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildTopCarousel(BuildContext context) {
-    return _SoftCard(
+      padding: const EdgeInsets.all(20),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: SizedBox(
-              height: 160,
-              width: double.infinity,
-              child: PageView.builder(
-                controller: _pageController,
-                itemCount: _carouselImages.length,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentPage = index;
-                  });
-                },
-                itemBuilder: (_, index) => Image.asset(
-                  _carouselImages[index],
-                  fit: BoxFit.cover,
-                ),
+          Row(
+            children: [
+              const Icon(Icons.format_quote_rounded,
+                  color: Colors.white54, size: 20),
+              const SizedBox(width: 6),
+              Text(
+                'Daily Inspiration',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Colors.white70,
+                      letterSpacing: 0.8,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '"$quote"',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              '— $author',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 13,
+                fontStyle: FontStyle.italic,
               ),
             ),
           ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(_carouselImages.length, (index) {
-              final isActive = _currentPage == index;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                height: 8,
-                width: isActive ? 24 : 8,
-                decoration: BoxDecoration(
-                  color: isActive ? const Color(0xFFF2A9AE) : const Color(0xFFD0D5DD),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              );
-            }),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildPerformanceTracker(BuildContext context, List<StudySession> sessions) {
-    final totalStudy = sessions.fold<int>(0, (sum, s) => sum + s.durationSeconds);
-    final totalBreak = sessions.fold<int>(0, (sum, s) => sum + s.breakDurationSeconds);
+  // ── Performance Tracker ─────────────────────────────────────────────────────
+
+  Widget _buildPerformanceTracker(
+      BuildContext context, List<StudySession> sessions) {
+    final totalStudy =
+        sessions.fold<int>(0, (sum, s) => sum + s.durationSeconds);
+    final totalBreak =
+        sessions.fold<int>(0, (sum, s) => sum + s.breakDurationSeconds);
     final totalStudyHours = (totalStudy / 3600).toStringAsFixed(1);
     final totalBreakMin = (totalBreak / 60).round();
 
@@ -246,9 +283,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         children: [
           const Icon(Icons.camera_alt_rounded, color: Color(0xFF7D8CC4)),
           const SizedBox(width: 10),
-          const Expanded(
-            child: Text('Focus Detection'),
-          ),
+          const Expanded(child: Text('Focus Detection')),
           TextButton(
             onPressed: _openDistractionDetection,
             child: const Text('Open'),
@@ -258,100 +293,132 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildAppBlockingCard(BuildContext context) {
+  // ── White Noise Player ──────────────────────────────────────────────────────
+
+  Widget _buildWhiteNoisePlayer(BuildContext context) {
     return _SoftCard(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'App Blocking',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          Switch(
-            value: _appBlockingEnabled,
-            onChanged: (value) {
-              setState(() {
-                _appBlockingEnabled = value;
-              });
-            },
-          ),
-          Text(
-            _appBlockingEnabled ? 'Enabled' : 'Disabled',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRainPlayer(BuildContext context) {
-    return _SoftCard(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: Stack(
-          children: [
-            SizedBox(
-              height: 170,
-              width: double.infinity,
-              child: Image.asset(
-                'assets/images/sounds/rain.jpg',
-                fit: BoxFit.cover,
+          Row(
+            children: [
+              const Icon(Icons.headphones_rounded,
+                  color: Color(0xFF7C5CBF), size: 22),
+              const SizedBox(width: 8),
+              Text(
+                'Ambient Sounds',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
               ),
+              const Spacer(),
+              if (_playingId != null)
+                TextButton.icon(
+                  onPressed: () async {
+                    await _audioService.stop();
+                    if (!mounted) return;
+                    setState(() => _playingId = null);
+                  },
+                  icon: const Icon(Icons.stop_rounded, size: 16),
+                  label: const Text('Stop'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFC7664F),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: kAmbientSounds.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 1.1,
             ),
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.45),
+            itemBuilder: (context, index) {
+              final sound = kAmbientSounds[index];
+              final isPlaying =
+                  _playingId == sound.id && _audioService.isPlaying;
+              return GestureDetector(
+                onTap: () => _toggleSound(sound),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  decoration: BoxDecoration(
+                    color: isPlaying
+                        ? const Color(0xFF7C5CBF)
+                        : Colors.white.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isPlaying
+                          ? const Color(0xFF7C5CBF)
+                          : const Color(0xFFE0E0E0),
+                      width: 1.5,
+                    ),
+                    boxShadow: isPlaying
+                        ? [
+                            BoxShadow(
+                              color:
+                                  const Color(0xFF7C5CBF).withOpacity(0.35),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            )
+                          ]
+                        : [],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(sound.emoji,
+                          style: const TextStyle(fontSize: 26)),
+                      const SizedBox(height: 4),
+                      Text(
+                        sound.name,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isPlaying
+                              ? Colors.white
+                              : const Color(0xFF2D3142),
+                        ),
+                      ),
+                      if (isPlaying)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 2),
+                          child: Icon(Icons.graphic_eq_rounded,
+                              size: 14, color: Colors.white70),
+                        ),
                     ],
                   ),
                 ),
-              ),
-            ),
-            Positioned(
-              left: 14,
-              bottom: 14,
-              right: 14,
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Rain & Thunder Focus Sound',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  FloatingActionButton.small(
-                    heroTag: 'rain_play',
-                    backgroundColor: Colors.white,
-                    onPressed: _toggleRain,
-                    child: Icon(
-                      _isRainPlaying ? Icons.pause : Icons.play_arrow,
-                      color: const Color(0xFF2D3142),
-                    ),
-                  ),
-                ],
+              );
+            },
+          ),
+          if (_playingId != null) ...[
+            const SizedBox(height: 10),
+            Center(
+              child: Text(
+                'Now playing: ${kAmbientSounds.firstWhere((s) => s.id == _playingId).name}  ${kAmbientSounds.firstWhere((s) => s.id == _playingId).emoji}',
+                style: const TextStyle(
+                  color: Color(0xFF7C5CBF),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
               ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }
 }
 
+// ── Shared widgets ────────────────────────────────────────────────────────────
+
 class _SoftCard extends StatelessWidget {
   const _SoftCard({required this.child});
-
   final Widget child;
 
   @override
@@ -372,7 +439,7 @@ class _SoftCard extends StatelessWidget {
           ),
         ],
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       child: child,
     );
   }

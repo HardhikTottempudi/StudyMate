@@ -21,7 +21,7 @@ class AppTheme {
         centerTitle: true,
         elevation: 0,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: Colors.white.withOpacity(0.84),
         elevation: 0,
         shape: RoundedRectangleBorder(

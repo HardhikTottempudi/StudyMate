@@ -5,6 +5,7 @@ import '../../timer/screens/timer_screen.dart';
 import '../../ai_flashcards/screens/flashcards_screen.dart';
 import '../../ai_mindmap/screens/mindmaps_screen.dart';
 import '../../study_streaks/screens/study_streaks_page.dart';
+import '../../studytok/screens/studytok_screen.dart';
 
 class MainNavigation extends ConsumerStatefulWidget {
   const MainNavigation({super.key});
@@ -16,12 +17,13 @@ class MainNavigation extends ConsumerStatefulWidget {
 class _MainNavigationState extends ConsumerState<MainNavigation> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const DashboardScreen(),
-    const TimerScreen(),
-    const FlashcardsScreen(),
-    const MindmapsScreen(),
-    const StudyStreaksPage(),
+  final List<Widget> _screens = const [
+    DashboardScreen(),
+    TimerScreen(),
+    FlashcardsScreen(),
+    MindmapsScreen(),
+    StudyTokScreen(),
+    StudyStreaksPage(),
   ];
 
   @override
@@ -37,15 +39,13 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
         indicatorColor: const Color(0xFFF6D7DC),
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          setState(() => _currentIndex = index);
         },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
             selectedIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
+            label: 'Home',
           ),
           NavigationDestination(
             icon: Icon(Icons.timer_outlined),
@@ -61,6 +61,11 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
             icon: Icon(Icons.account_tree_outlined),
             selectedIcon: Icon(Icons.account_tree),
             label: 'Mindmaps',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.play_circle_outline_rounded),
+            selectedIcon: Icon(Icons.play_circle_rounded),
+            label: 'StudyTok',
           ),
           NavigationDestination(
             icon: Icon(Icons.local_fire_department_outlined),
