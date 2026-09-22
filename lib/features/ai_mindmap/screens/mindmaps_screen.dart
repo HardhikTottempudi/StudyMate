@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/soft_surface.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/ai_service.dart';
@@ -20,6 +21,14 @@ class _MindmapsScreenState extends ConsumerState<MindmapsScreen> {
   bool _isSaved = false;
   Mindmap? _generatedMindmap;
 
+  late final Stream<List<Mindmap>> _savedTopics;
+
+  @override
+  void initState() {
+    super.initState();
+    _savedTopics = ref.read(firestoreServiceProvider).getMindmaps();
+  }
+
   @override
   void dispose() {
     _promptController.dispose();
@@ -28,7 +37,8 @@ class _MindmapsScreenState extends ConsumerState<MindmapsScreen> {
 
   Future<void> _generateMindmap() async {
     final prompt = _promptController.text.trim();
-    if (prompt.isEmpty) return;
+    if (prompt.isEmpty || _isLoading || _isSaving) return;
+    FocusScope.of(context).unfocus();
 
     setState(() {
       _isLoading = true;
@@ -45,13 +55,16 @@ class _MindmapsScreenState extends ConsumerState<MindmapsScreen> {
         createdAt: DateTime.now(),
         root: MindmapNode.fromMap(rootMap),
       );
+      if (!mounted) return;
       setState(() {
         _generatedMindmap = generatedMindmap;
       });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Mindmap error: $e')),
+        const SnackBar(
+            content: Text(
+                'Couldn’t generate a mindmap. Check your connection and try again.')),
       );
     } finally {
       if (mounted) {
@@ -63,7 +76,8 @@ class _MindmapsScreenState extends ConsumerState<MindmapsScreen> {
   }
 
   Future<void> _saveMindmap() async {
-    if (_generatedMindmap == null || _isSaving || _isSaved) return;
+    if (_generatedMindmap == null || _isSaving || _isSaved || _isLoading)
+      return;
     setState(() {
       _isSaving = true;
     });
@@ -94,18 +108,7 @@ class _MindmapsScreenState extends ConsumerState<MindmapsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('AI Mindmaps')),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFEEF3FF),
-              Color(0xFFF4EEFF),
-              Color(0xFFF0FAF5),
-            ],
-          ),
-        ),
+      body: SoftBackdrop(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Column(
@@ -132,14 +135,17 @@ class _MindmapsScreenState extends ConsumerState<MindmapsScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: _generatedMindmap == null || _isSaving || _isSaved
+                            onPressed: _generatedMindmap == null ||
+                                    _isSaving ||
+                                    _isSaved
                                 ? null
                                 : _saveMindmap,
                             child: _isSaving
                                 ? const SizedBox(
                                     height: 16,
                                     width: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
                                   )
                                 : Text(_isSaved ? 'Saved' : 'Save'),
                           ),
@@ -190,7 +196,8 @@ class _MindmapsScreenState extends ConsumerState<MindmapsScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => MindmapViewerScreen(mindmap: _generatedMindmap!),
+                    builder: (_) =>
+                        MindmapViewerScreen(mindmap: _generatedMindmap!),
                   ),
                 );
               },
@@ -216,17 +223,19 @@ class _MindmapsScreenState extends ConsumerState<MindmapsScreen> {
           const SizedBox(height: 8),
           Expanded(
             child: StreamBuilder<List<Mindmap>>(
-              stream: ref.read(firestoreServiceProvider).getMindmaps(),
+              stream: _savedTopics,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snapshot.hasError) {
-                  return const Center(child: Text('Failed to load saved topics'));
+                  return const Center(
+                      child: Text('Failed to load saved topics'));
                 }
                 final maps = snapshot.data ?? [];
                 if (maps.isEmpty) {
-                  return const Center(child: Text('No saved mindmap topics yet'));
+                  return const Center(
+                      child: Text('No saved mindmap topics yet'));
                 }
                 return ListView.separated(
                   itemCount: maps.length,
@@ -239,7 +248,8 @@ class _MindmapsScreenState extends ConsumerState<MindmapsScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                       title: Text(map.title),
-                      subtitle: Text('${map.root.children.length} main branches'),
+                      subtitle:
+                          Text('${map.root.children.length} main branches'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () {
                         Navigator.push(
@@ -264,24 +274,8 @@ class _MindmapsScreenState extends ConsumerState<MindmapsScreen> {
 class _SoftCard extends StatelessWidget {
   const _SoftCard({required this.child});
   final Widget child;
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
+  Widget build(BuildContext context) => SizedBox(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 16,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
+      child: SoftSurface(padding: const EdgeInsets.all(16), child: child));
 }

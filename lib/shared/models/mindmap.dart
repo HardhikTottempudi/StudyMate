@@ -22,8 +22,8 @@ class MindmapNode {
       id: map['id'] ?? '',
       text: map['text'] ?? '',
       children: (map['children'] as List<dynamic>?)
-              ?.map((child) =>
-                  MindmapNode.fromMap(child as Map<String, dynamic>))
+              ?.map(
+                  (child) => MindmapNode.fromMap(child as Map<String, dynamic>))
               .toList() ??
           [],
     );

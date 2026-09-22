@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../services/firestore_service.dart';
 import '../../../shared/models/study_session.dart';
 import 'package:uuid/uuid.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class TimerState {
+  final bool isSaving;
   final bool isSessionActive;
   final bool isRunning;
   final bool isOnBreak;
@@ -18,6 +18,7 @@ class TimerState {
   final List<String> blockedApps;
 
   TimerState({
+    this.isSaving = false,
     this.isSessionActive = false,
     this.isRunning = false,
     this.isOnBreak = false,
@@ -32,6 +33,7 @@ class TimerState {
   });
 
   TimerState copyWith({
+    bool? isSaving,
     bool? isSessionActive,
     bool? isRunning,
     bool? isOnBreak,
@@ -45,6 +47,7 @@ class TimerState {
     List<String>? blockedApps,
   }) {
     return TimerState(
+      isSaving: isSaving ?? this.isSaving,
       isSessionActive: isSessionActive ?? this.isSessionActive,
       isRunning: isRunning ?? this.isRunning,
       isOnBreak: isOnBreak ?? this.isOnBreak,
@@ -61,9 +64,15 @@ class TimerState {
 }
 
 class TimerController extends StateNotifier<TimerState> {
-  TimerController(this._firestoreService) : super(TimerState());
-
-  final FirestoreService _firestoreService;
+  TimerController(this._save, {Duration Function()? elapsedNow})
+      : super(TimerState()) {
+    _elapsedNow = elapsedNow ?? (() => _clock.elapsed);
+  }
+  final Future<void> Function(StudySession) _save;
+  final Stopwatch _clock = Stopwatch()..start();
+  late final Duration Function() _elapsedNow;
+  Duration _lastTick = Duration.zero;
+  String? _sessionId;
 
   void startSession({
     required int goalDurationSeconds,
@@ -71,7 +80,12 @@ class TimerController extends StateNotifier<TimerState> {
     required bool appBlockEnabled,
     required List<String> blockedApps,
   }) {
-    if (state.isSessionActive) return;
+    if (state.isSessionActive || state.isSaving) return;
+    if (goalDurationSeconds < 60 || goalDurationSeconds > 12 * 3600) {
+      throw ArgumentError('Choose a goal between 1 and 720 minutes.');
+    }
+    _sessionId = const Uuid().v4();
+    _lastTick = _elapsedNow();
     state = TimerState(
       isSessionActive: true,
       isRunning: true,
@@ -88,17 +102,24 @@ class TimerController extends StateNotifier<TimerState> {
   }
 
   void pauseSession() {
-    if (!state.isSessionActive || !state.isRunning) return;
+    if (!state.isSessionActive || !state.isRunning || state.isSaving) return;
+    tick();
     state = state.copyWith(isRunning: false);
   }
 
   void resumeSession() {
-    if (!state.isSessionActive || state.isRunning) return;
+    if (!state.isSessionActive || state.isRunning || state.isSaving) return;
+    _lastTick = _elapsedNow();
     state = state.copyWith(isRunning: true);
   }
 
   void startBreak() {
-    if (!state.isSessionActive || !state.isRunning || state.isOnBreak) return;
+    if (!state.isSessionActive ||
+        !state.isRunning ||
+        state.isOnBreak ||
+        state.isSaving) return;
+    tick();
+    _lastTick = _elapsedNow();
     state = state.copyWith(
       isOnBreak: true,
       breakCount: state.breakCount + 1,
@@ -106,21 +127,28 @@ class TimerController extends StateNotifier<TimerState> {
   }
 
   void endBreak() {
-    if (!state.isSessionActive || !state.isOnBreak) return;
+    if (!state.isSessionActive || !state.isOnBreak || state.isSaving) return;
+    tick();
+    _lastTick = _elapsedNow();
     state = state.copyWith(isOnBreak: false);
   }
 
   void resetSession() {
+    if (state.isSaving) return;
+    _sessionId = null;
     state = TimerState(goalDurationSeconds: state.goalDurationSeconds);
   }
 
   void tick() {
-    if (!state.isSessionActive || !state.isRunning) return;
-    if (state.isOnBreak) {
-      state = state.copyWith(elapsedBreakSeconds: state.elapsedBreakSeconds + 1);
-      return;
-    }
-    state = state.copyWith(elapsedStudySeconds: state.elapsedStudySeconds + 1);
+    if (!state.isSessionActive || !state.isRunning || state.isSaving) return;
+    final seconds = (_elapsedNow() - _lastTick).inSeconds;
+    if (seconds <= 0) return;
+    _lastTick += Duration(seconds: seconds);
+    state = state.isOnBreak
+        ? state.copyWith(
+            elapsedBreakSeconds: state.elapsedBreakSeconds + seconds)
+        : state.copyWith(
+            elapsedStudySeconds: state.elapsedStudySeconds + seconds);
   }
 
   bool get isGoalReached =>
@@ -133,14 +161,14 @@ class TimerController extends StateNotifier<TimerState> {
   }
 
   Future<void> stopAndSave() async {
-    if (state.sessionStartTime == null) return;
+    if (state.sessionStartTime == null || state.isSaving) return;
+    pauseSession();
     if (state.elapsedStudySeconds == 0 && state.elapsedBreakSeconds == 0) {
-      resetSession();
-      return;
+      throw StateError('Study for at least a second before saving.');
     }
 
     final session = StudySession(
-      id: const Uuid().v4(),
+      id: _sessionId!,
       sessionName: state.sessionName,
       startTime: state.sessionStartTime!,
       endTime: DateTime.now(),
@@ -153,11 +181,25 @@ class TimerController extends StateNotifier<TimerState> {
       createdAt: DateTime.now(),
     );
 
-    await _firestoreService.saveStudySession(session);
-    resetSession();
+    state = state.copyWith(isSaving: true);
+    try {
+      await _save(session).timeout(const Duration(seconds: 30));
+      if (!mounted) return;
+      state = state.copyWith(isSaving: false);
+      resetSession();
+    } catch (_) {
+      if (mounted) state = state.copyWith(isSaving: false);
+      rethrow;
+    }
+  }
+
+  @override
+  void dispose() {
+    _clock.stop();
+    super.dispose();
   }
 }
 
 final timerProvider = StateNotifierProvider<TimerController, TimerState>((ref) {
-  return TimerController(ref.watch(firestoreServiceProvider));
+  return TimerController(ref.watch(firestoreServiceProvider).saveStudySession);
 });

@@ -1,6 +1,7 @@
 import 'dart:async';
-import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/soft_surface.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/timer_provider.dart';
@@ -12,14 +13,15 @@ class TimerScreen extends ConsumerStatefulWidget {
   ConsumerState<TimerScreen> createState() => _TimerScreenState();
 }
 
-class _TimerScreenState extends ConsumerState<TimerScreen> with WidgetsBindingObserver {
+class _TimerScreenState extends ConsumerState<TimerScreen>
+    with WidgetsBindingObserver {
   static final Uri _roboflowUri = Uri.parse(
     'https://demo.roboflow.com/drowsiness-sgvf2-tixi5/1?publishable_key=rf_JULDEIHODmWX9hxVH5cPND0AiSs2',
   );
 
   Timer? _timer;
   bool _goalReachedNotified = false;
-  bool _sessionKilledByBackground = false;
+  bool _sessionPausedByBackground = false;
   final TextEditingController _sessionNameController = TextEditingController();
   final TextEditingController _goalMinutesController =
       TextEditingController(text: '25');
@@ -51,18 +53,19 @@ class _TimerScreenState extends ConsumerState<TimerScreen> with WidgetsBindingOb
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
       final timerState = ref.read(timerProvider);
-      if (timerState.isSessionActive && !timerState.isOnBreak) {
-        _sessionKilledByBackground = true;
-        ref.read(timerProvider.notifier).resetSession();
+      if (timerState.isSessionActive && timerState.isRunning) {
+        _sessionPausedByBackground = true;
+        ref.read(timerProvider.notifier).pauseSession();
       }
     }
-    if (state == AppLifecycleState.resumed && _sessionKilledByBackground) {
-      _sessionKilledByBackground = false;
+    if (state == AppLifecycleState.resumed && _sessionPausedByBackground) {
+      _sessionPausedByBackground = false;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Session ended — you left the app during a study session.'),
+            content: Text(
+                'Session paused. Your progress is safe; resume when you’re ready.'),
             duration: Duration(seconds: 4),
             backgroundColor: Color(0xFFC7664F),
           ),
@@ -88,7 +91,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> with WidgetsBindingOb
 
   int _goalSeconds() {
     final minutes = int.tryParse(_goalMinutesController.text.trim());
-    if (minutes == null || minutes <= 0) return 25 * 60;
+    if (minutes == null || minutes <= 0 || minutes > 720) return 0;
     return minutes * 60;
   }
 
@@ -116,18 +119,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> with WidgetsBindingOb
 
     return Scaffold(
       appBar: AppBar(title: const Text('Study Session')),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFF5EFFF),
-              Color(0xFFF0FAFF),
-              Color(0xFFEFF9F2),
-            ],
-          ),
-        ),
+      body: SoftBackdrop(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           child: Column(
@@ -153,6 +145,12 @@ class _TimerScreenState extends ConsumerState<TimerScreen> with WidgetsBindingOb
                             controller: _goalMinutesController,
                             enabled: !timerState.isSessionActive,
                             keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(3)
+                            ],
+                            decoration:
+                                const InputDecoration(hintText: '1–720'),
                             textAlign: TextAlign.center,
                           ),
                         ),
@@ -175,7 +173,8 @@ class _TimerScreenState extends ConsumerState<TimerScreen> with WidgetsBindingOb
                           ),
                     ),
                     const SizedBox(height: 8),
-                    Text('Remaining: ${_formatDuration(controller.remainingStudySeconds)}'),
+                    Text(
+                        'Remaining: ${_formatDuration(controller.remainingStudySeconds)}'),
                     const SizedBox(height: 4),
                     Text(
                       'Breaks: ${timerState.breakCount}  |  Break time: ${_formatDuration(timerState.elapsedBreakSeconds)}',
@@ -190,10 +189,20 @@ class _TimerScreenState extends ConsumerState<TimerScreen> with WidgetsBindingOb
                           onPressed: timerState.isSessionActive
                               ? null
                               : () {
+                                  if (_goalSeconds() == 0) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                            content: Text(
+                                                'Choose a goal between 1 and 720 minutes.')));
+                                    return;
+                                  }
+                                  FocusScope.of(context).unfocus();
                                   controller.startSession(
                                     goalDurationSeconds: _goalSeconds(),
-                                    sessionName: _sessionNameController.text.trim(),
-                                    appBlockEnabled: _blocked.values.any((v) => v),
+                                    sessionName:
+                                        _sessionNameController.text.trim(),
+                                    appBlockEnabled:
+                                        _blocked.values.any((v) => v),
                                     blockedApps: _blocked.entries
                                         .where((entry) => entry.value)
                                         .map((entry) => entry.key)
@@ -208,28 +217,42 @@ class _TimerScreenState extends ConsumerState<TimerScreen> with WidgetsBindingOb
                               : timerState.isSessionActive
                                   ? () => controller.resumeSession()
                                   : null,
-                          child: Text(timerState.isRunning ? 'Pause' : 'Resume'),
-                        ),
-                        ElevatedButton(
-                          onPressed: timerState.isSessionActive
-                              ? () async {
-                                  final messenger = ScaffoldMessenger.of(context);
-                                  await controller.stopAndSave();
-                                  if (!mounted) return;
-                                  messenger.showSnackBar(
-                                    const SnackBar(content: Text('Session saved')),
-                                  );
-                                }
-                              : null,
-                          child: const Text('Stop & Save'),
+                          child:
+                              Text(timerState.isRunning ? 'Pause' : 'Resume'),
                         ),
                         ElevatedButton(
                           onPressed:
-                              timerState.isSessionActive && !timerState.isOnBreak
-                                  ? () => controller.startBreak()
-                                  : timerState.isSessionActive && timerState.isOnBreak
-                                      ? () => controller.endBreak()
-                                      : null,
+                              timerState.isSessionActive && !timerState.isSaving
+                                  ? () async {
+                                      final messenger =
+                                          ScaffoldMessenger.of(context);
+                                      try {
+                                        await controller.stopAndSave();
+                                      } catch (_) {
+                                        if (!mounted) return;
+                                        messenger.showSnackBar(const SnackBar(
+                                            content: Text(
+                                                'Couldn’t save yet. Your session is paused—check your connection and try again.')));
+                                        return;
+                                      }
+                                      if (!mounted) return;
+                                      messenger.showSnackBar(
+                                        const SnackBar(
+                                            content: Text('Session saved')),
+                                      );
+                                    }
+                                  : null,
+                          child: Text(
+                              timerState.isSaving ? 'Saving…' : 'Stop & Save'),
+                        ),
+                        ElevatedButton(
+                          onPressed: timerState.isSessionActive &&
+                                  !timerState.isOnBreak
+                              ? () => controller.startBreak()
+                              : timerState.isSessionActive &&
+                                      timerState.isOnBreak
+                                  ? () => controller.endBreak()
+                                  : null,
                           child: Text(
                             timerState.isOnBreak ? 'End Break' : 'Start Break',
                           ),
@@ -240,12 +263,13 @@ class _TimerScreenState extends ConsumerState<TimerScreen> with WidgetsBindingOb
                 ),
               ),
               const SizedBox(height: 14),
-              if (Platform.isIOS)
+              if (Theme.of(context).platform == TargetPlatform.iOS)
                 _SoftCard(
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.shield_rounded, color: Color(0xFF95B8F6)),
+                      const Icon(Icons.shield_rounded,
+                          color: Color(0xFF95B8F6)),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
@@ -253,13 +277,16 @@ class _TimerScreenState extends ConsumerState<TimerScreen> with WidgetsBindingOb
                           children: [
                             Text(
                               'Focus Protection',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
                                     fontWeight: FontWeight.w700,
                                   ),
                             ),
                             const SizedBox(height: 4),
                             const Text(
-                              'If you leave this app during a session, your session will be automatically ended.',
+                              'Leaving the app pauses your timer without losing progress. Resume when you return. This does not block other apps.',
                               style: TextStyle(color: Color(0xFF666666)),
                             ),
                           ],
@@ -275,9 +302,10 @@ class _TimerScreenState extends ConsumerState<TimerScreen> with WidgetsBindingOb
                     children: [
                       Text(
                         'Blocked Apps',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                       ),
                       const SizedBox(height: 6),
                       ..._apps.map((app) {
@@ -317,26 +345,9 @@ class _TimerScreenState extends ConsumerState<TimerScreen> with WidgetsBindingOb
 
 class _SoftCard extends StatelessWidget {
   const _SoftCard({required this.child});
-
   final Widget child;
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
+  Widget build(BuildContext context) => SizedBox(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.78),
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x18000000),
-            blurRadius: 16,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
+      child: SoftSurface(padding: const EdgeInsets.all(16), child: child));
 }

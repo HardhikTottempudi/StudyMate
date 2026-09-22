@@ -7,6 +7,7 @@ This backend keeps `GEMINI_API_KEY` server-side and verifies Firebase ID tokens 
 - `POST /generateContent/flashcards`
 - `POST /generateContent/mindmap`
 - `GET /health`
+- `GET /studytok/videos?hashtag=Maths` — automatic YouTube hashtag feed
 
 ## Request Format
 
@@ -81,3 +82,7 @@ Run Flutter with backend URL:
 ```powershell
 flutter run --dart-define=AI_BACKEND_BASE_URL=https://YOUR_CLOUD_RUN_URL
 ```
+
+## StudyTok setup
+
+Set `YOUTUBE_API_KEY` in the backend environment, with YouTube Data API v3 enabled, then redeploy. Keep the key server-side. The authenticated endpoint discovers YouTube videos, checks their full metadata for exact study hashtags, and excludes entertainment hashtags. It needs no Firestore catalog or manual approval. Results are cached for one hour per tag. See [system design and setup](../docs/SYSTEM_DESIGN.md).

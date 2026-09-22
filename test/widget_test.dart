@@ -1,30 +1,53 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:studymate/main.dart';
+import 'package:studymate/features/studytok/models/study_video.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
-
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  final matched = <String, dynamic>{
+    'youtubeId': 'abcdefghijk',
+    'title': 'Fractions',
+    'creator': 'Math teacher',
+    'subject': 'Maths',
+    'description': 'Add fractions. #Maths',
+    'hashtags': ['#Maths'],
+  };
+  test('only valid hashtag matches can enter the feed', () {
+    expect(StudyVideo.parse('one', matched), isNotNull);
+    for (final patch in [
+      {
+        'hashtags': ['#Comedy']
+      },
+      {'hashtags': 'study'},
+      {'youtubeId': 'https://youtube.com'},
+      {'title': ''},
+      {'subject': 'Comedy'},
+      {'creator': 42},
+      {'hashtags': []},
+    ]) {
+      expect(StudyVideo.parse('one', {...matched, ...patch}), isNull);
+    }
+  });
+  test(
+      'navigation cannot escape to searches, other videos, schemes or spoofed hosts',
+      () {
+    expect(
+        allowsStudyVideoNavigation(
+            'https://www.youtube-nocookie.com/embed/abcdefghijk?rel=0',
+            'abcdefghijk'),
+        isTrue);
+    for (final url in [
+      'https://www.youtube.com/watch?v=abcdefghijk',
+      'https://www.youtube.com/results?search_query=study+funny',
+      'https://www.youtube.com/shorts/abcdefghijk',
+      'https://www.youtube.com/embed/otherVideo1',
+      'https://www.youtube.com.evil.test/embed/abcdefghijk',
+      'https://www.youtube.com@evil.test/embed/abcdefghijk',
+      'http://www.youtube.com/embed/abcdefghijk',
+      'javascript:alert(1)',
+      'youtube://watch?v=abcdefghijk',
+      'https://www.youtube.com/embed/abcdefghijk?list=arbitrary',
+    ]) {
+      expect(allowsStudyVideoNavigation(url, 'abcdefghijk'), isFalse,
+          reason: url);
+    }
   });
 }
