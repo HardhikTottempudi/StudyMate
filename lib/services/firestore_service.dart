@@ -42,10 +42,11 @@ class FirestoreService {
 
   // Study Sessions
   Future<void> saveStudySession(StudySession session) async {
-    if (currentUserId == null) return;
+    final uid = currentUserId;
+    if (uid == null) throw StateError('Sign in before saving a session.');
     await _firestore
         .collection('users')
-        .doc(currentUserId)
+        .doc(uid)
         .collection('studySessions')
         .doc(session.id)
         .set(session.toMap());
@@ -73,8 +74,7 @@ class FirestoreService {
         .collection('users')
         .doc(currentUserId)
         .collection('studySessions')
-        .where('createdAt',
-            isGreaterThanOrEqualTo: start.toIso8601String())
+        .where('createdAt', isGreaterThanOrEqualTo: start.toIso8601String())
         .where('createdAt', isLessThanOrEqualTo: end.toIso8601String())
         .get();
     return snapshot.docs

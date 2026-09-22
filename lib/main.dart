@@ -15,9 +15,27 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
   } catch (e) {
-    debugPrint('Firebase initialization error: $e');
+    runApp(MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: Scaffold(
+          body: SafeArea(
+              child: Center(
+                  child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.cloud_off_rounded, size: 48),
+              const SizedBox(height: 16),
+              const Text(
+                  'StudyMate couldn’t start. Check your connection and try again.',
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(onPressed: main, child: const Text('Try again')),
+            ]),
+          ))),
+        )));
+    return;
   }
-  
+
   runApp(const ProviderScope(child: StudyMateApp()));
 }
 
@@ -49,7 +67,7 @@ class AuthWrapper extends ConsumerWidget {
           );
         }
         if (snapshot.hasData) {
-          return const MainNavigation();
+          return MainNavigation(key: ValueKey(snapshot.data!.uid));
         }
         return const StartPage();
       },

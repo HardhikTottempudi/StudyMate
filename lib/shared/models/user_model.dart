@@ -24,9 +24,8 @@ class UserModel {
       uid: uid,
       email: map['email'] ?? '',
       displayName: map['displayName'],
-      createdAt: map['createdAt'] != null
-          ? DateTime.parse(map['createdAt'])
-          : null,
+      createdAt:
+          map['createdAt'] != null ? DateTime.parse(map['createdAt']) : null,
     );
   }
 }

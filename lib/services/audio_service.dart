@@ -1,30 +1,38 @@
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter/foundation.dart';
 
 class AmbientSound {
   final String id;
   final String name;
   final String emoji;
-  final String url; // streaming URL
+  final String? url;
+  final String? assetPath;
   final String description;
 
   const AmbientSound({
     required this.id,
     required this.name,
     required this.emoji,
-    required this.url,
+    this.url,
+    this.assetPath,
     required this.description,
-  });
+  }) : assert((url == null) != (assetPath == null));
 }
 
-/// Curated list of free ambient sound streams (SomaFM + freesound CDN)
+/// Bundled sounds work offline; radio stations require an internet connection.
 const List<AmbientSound> kAmbientSounds = [
   AmbientSound(
     id: 'rain',
     name: 'Rain',
     emoji: '🌧️',
-    url: 'https://www.soundjay.com/nature/rain-01.mp3',
-    description: 'Gentle rain shower',
+    assetPath: 'audio/rain.mp3',
+    description: 'Gentle rain shower · Offline',
+  ),
+  AmbientSound(
+    id: 'white_noise',
+    name: 'White Noise',
+    emoji: '☁️',
+    assetPath: 'audio/white_noise.wav',
+    description: 'Steady background noise · Offline',
   ),
   AmbientSound(
     id: 'ocean',
@@ -76,11 +84,17 @@ class AudioService {
       if (_currentId == sound.id && _isPlaying) return;
       await _player.stop();
       await _player.setReleaseMode(ReleaseMode.loop);
-      await _player.play(UrlSource(sound.url));
+      await _player.play(
+        sound.assetPath != null
+            ? AssetSource(sound.assetPath!)
+            : UrlSource(sound.url!),
+      );
       _currentId = sound.id;
       _isPlaying = true;
     } catch (e) {
-      debugPrint('AudioService.play error: $e');
+      _currentId = null;
+      _isPlaying = false;
+      rethrow;
     }
   }
 

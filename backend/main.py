@@ -215,3 +215,23 @@ Notes: {request.notes or ""}
     root.setdefault("text", request.topic)
     root.setdefault("children", [])
     return {"root": root}
+
+# StudyTok uses the same authenticated backend as AI generation.
+try:
+    from .studytok import FeedError, HashtagFeed
+except ImportError:
+    from studytok import FeedError, HashtagFeed
+
+_studytok_feed = HashtagFeed()
+
+
+@app.get('/studytok/videos')
+def studytok_videos(
+    hashtag: str = 'All',
+    authorization: Optional[str] = Header(default=None),
+) -> Dict[str, Any]:
+    _require_token(authorization)
+    try:
+        return _studytok_feed.get(hashtag)
+    except FeedError as error:
+        raise HTTPException(status_code=error.status, detail=error.code) from None

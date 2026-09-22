@@ -7,6 +7,7 @@ final authProvider = StreamProvider<User?>((ref) {
 });
 
 final firestoreServiceProvider = Provider<FirestoreService>((ref) {
+  ref.watch(authProvider);
   return FirestoreService();
 });
 
@@ -17,7 +18,8 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
   final FirebaseAuth _auth;
   final FirestoreService _firestoreService;
 
-  Future<void> signUp(String email, String password, String? displayName, String username) async {
+  Future<void> signUp(String email, String password, String? displayName,
+      String username) async {
     state = const AsyncValue.loading();
     try {
       final credential = await _auth.createUserWithEmailAndPassword(

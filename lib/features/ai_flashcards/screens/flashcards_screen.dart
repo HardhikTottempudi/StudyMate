@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/soft_surface.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/ai_service.dart';
@@ -15,10 +16,20 @@ class FlashcardsScreen extends ConsumerStatefulWidget {
 
 class _FlashcardsScreenState extends ConsumerState<FlashcardsScreen> {
   final TextEditingController _promptController = TextEditingController();
+  String _generatedTitle = '';
+  String? _generatedId;
   bool _isLoading = false;
   bool _isSaving = false;
   bool _isSaved = false;
   List<Flashcard> _flashcards = [];
+
+  late final Stream<List<FlashcardSet>> _savedTopics;
+
+  @override
+  void initState() {
+    super.initState();
+    _savedTopics = ref.read(firestoreServiceProvider).getFlashcardSets();
+  }
 
   @override
   void dispose() {
@@ -28,7 +39,8 @@ class _FlashcardsScreenState extends ConsumerState<FlashcardsScreen> {
 
   Future<void> _generateFlashcards() async {
     final prompt = _promptController.text.trim();
-    if (prompt.isEmpty) return;
+    if (prompt.isEmpty || _isLoading || _isSaving) return;
+    FocusScope.of(context).unfocus();
 
     setState(() {
       _isLoading = true;
@@ -46,13 +58,18 @@ class _FlashcardsScreenState extends ConsumerState<FlashcardsScreen> {
           .where((card) => card.question.isNotEmpty && card.answer.isNotEmpty)
           .toList();
 
+      if (!mounted) return;
       setState(() {
         _flashcards = cards;
+        _generatedTitle = prompt;
+        _generatedId = const Uuid().v4();
       });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Flashcards error: $e')),
+        const SnackBar(
+            content: Text(
+                'Couldn’t generate flashcards. Check your connection and try again.')),
       );
     } finally {
       if (mounted) {
@@ -64,14 +81,14 @@ class _FlashcardsScreenState extends ConsumerState<FlashcardsScreen> {
   }
 
   Future<void> _saveFlashcards() async {
-    if (_flashcards.isEmpty || _isSaving) return;
+    if (_flashcards.isEmpty || _isSaving || _isLoading || _isSaved) return;
     setState(() {
       _isSaving = true;
     });
     try {
       final set = FlashcardSet(
-        id: const Uuid().v4(),
-        title: _promptController.text.trim(),
+        id: _generatedId!,
+        title: _generatedTitle,
         sourceText: null,
         cards: _flashcards,
         createdAt: DateTime.now(),
@@ -102,18 +119,7 @@ class _FlashcardsScreenState extends ConsumerState<FlashcardsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('AI Flashcards')),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFFDEDF4),
-              Color(0xFFF2F7FF),
-              Color(0xFFF0FAF4),
-            ],
-          ),
-        ),
+      body: SoftBackdrop(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Column(
@@ -140,14 +146,16 @@ class _FlashcardsScreenState extends ConsumerState<FlashcardsScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: _flashcards.isEmpty || _isSaved || _isSaving
-                                ? null
-                                : _saveFlashcards,
+                            onPressed:
+                                _flashcards.isEmpty || _isSaved || _isSaving
+                                    ? null
+                                    : _saveFlashcards,
                             child: _isSaving
                                 ? const SizedBox(
                                     height: 16,
                                     width: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
                                   )
                                 : Text(_isSaved ? 'Saved' : 'Save'),
                           ),
@@ -204,17 +212,19 @@ class _FlashcardsScreenState extends ConsumerState<FlashcardsScreen> {
           const SizedBox(height: 6),
           Expanded(
             child: StreamBuilder<List<FlashcardSet>>(
-              stream: ref.read(firestoreServiceProvider).getFlashcardSets(),
+              stream: _savedTopics,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snapshot.hasError) {
-                  return const Center(child: Text('Failed to load saved topics'));
+                  return const Center(
+                      child: Text('Failed to load saved topics'));
                 }
                 final sets = snapshot.data ?? [];
                 if (sets.isEmpty) {
-                  return const Center(child: Text('No saved flashcard topics yet'));
+                  return const Center(
+                      child: Text('No saved flashcard topics yet'));
                 }
                 return ListView.separated(
                   itemCount: sets.length,
@@ -233,7 +243,8 @@ class _FlashcardsScreenState extends ConsumerState<FlashcardsScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => FlashcardViewerScreen(flashcardSet: set),
+                            builder: (_) =>
+                                FlashcardViewerScreen(flashcardSet: set),
                           ),
                         );
                       },
@@ -252,26 +263,10 @@ class _FlashcardsScreenState extends ConsumerState<FlashcardsScreen> {
 class _SoftCard extends StatelessWidget {
   const _SoftCard({required this.child});
   final Widget child;
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
+  Widget build(BuildContext context) => SizedBox(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x12000000),
-            blurRadius: 16,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
+      child: SoftSurface(padding: const EdgeInsets.all(16), child: child));
 }
 
 class _FlipCard extends StatefulWidget {

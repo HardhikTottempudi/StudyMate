@@ -16,19 +16,22 @@ class AIService {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception('User not authenticated');
 
-      final idToken = await user.getIdToken();
-      
-      final response = await http.post(
-        Uri.parse('$_backendBaseUrl/generateContent/flashcards'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $idToken',
-        },
-        body: jsonEncode({
-          'topic': topic,
-          'notes': notes,
-        }),
-      );
+      final idToken =
+          await user.getIdToken().timeout(const Duration(seconds: 15));
+
+      final response = await http
+          .post(
+            Uri.parse('$_backendBaseUrl/generateContent/flashcards'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $idToken',
+            },
+            body: jsonEncode({
+              'topic': topic,
+              'notes': notes,
+            }),
+          )
+          .timeout(const Duration(seconds: 45));
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
@@ -52,19 +55,22 @@ class AIService {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception('User not authenticated');
 
-      final idToken = await user.getIdToken();
-      
-      final response = await http.post(
-        Uri.parse('$_backendBaseUrl/generateContent/mindmap'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $idToken',
-        },
-        body: jsonEncode({
-          'topic': topic,
-          'notes': notes,
-        }),
-      );
+      final idToken =
+          await user.getIdToken().timeout(const Duration(seconds: 15));
+
+      final response = await http
+          .post(
+            Uri.parse('$_backendBaseUrl/generateContent/mindmap'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $idToken',
+            },
+            body: jsonEncode({
+              'topic': topic,
+              'notes': notes,
+            }),
+          )
+          .timeout(const Duration(seconds: 45));
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
